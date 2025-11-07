@@ -38,22 +38,43 @@ fn disable_raw_mode(fd: i32, original_termios: &termios) -> io::Result<()> {
 }
 
 struct EchoState {
-    input: String,
+    current_input: String,
+    output_lines: Vec<String>,
 }
 
 impl EchoState {
     fn new() -> Self {
         Self {
-            input: String::new(),
+            current_input: String::new(),
+            output_lines: Vec::new(),
         }
     }
 
     fn add_char(&mut self, ch: char) {
-        self.input.push(ch);
+        self.current_input.push(ch);
     }
 
     fn remove_char(&mut self) {
-        self.input.pop();
+        self.current_input.pop();
+    }
+
+    fn submit_current_input(&mut self) {
+        if !self.current_input.is_empty() {
+            self.output_lines.push(self.current_input.clone());
+            self.current_input.clear();
+        }
+    }
+
+    fn get_display_output(&self) -> String {
+        if self.output_lines.is_empty() {
+            if self.current_input.is_empty() {
+                String::new()
+            } else {
+                self.current_input.clone()
+            }
+        } else {
+            format!("{}\n{}", self.output_lines.join("\n"), self.current_input)
+        }
     }
 }
 
@@ -70,15 +91,24 @@ fn render_echo_display(state: &EchoState) {
     // Header
     println!("=== Interactive Character Echo ===");
     println!("Type characters to see them echoed above instantly");
-    println!("Press ESC or Ctrl+C to quit | Backspace to delete");
+    println!("Press ESC or Ctrl+C to quit | Enter to submit line | Backspace to delete");
     println!();
 
-    // Output area
-    println!("Your input:");
-    println!("  {}", state.input);
+    // Output area with all history
+    let display_output = state.get_display_output();
+    if !display_output.is_empty() {
+        println!("Your input:");
+        for line in display_output.lines() {
+            println!("  {}", line);
+        }
+    } else {
+        println!("Your input:");
+        println!("  (start typing...)");
+    }
 
     // Fill remaining output area with empty lines
-    for _ in 0..(OUTPUT_HEIGHT as usize - 6) { // 6 lines used above
+    let used_lines = 4 + if display_output.is_empty() { 1 } else { 1 + display_output.lines().count() };
+    for _ in 0..(OUTPUT_HEIGHT as usize - used_lines) {
         println!();
     }
 
@@ -91,11 +121,11 @@ fn render_echo_display(state: &EchoState) {
     // Fixed input area at bottom (move to bottom, then up for input)
     print!("\x1b[{}A\x1b[G", INPUT_HEIGHT - 1);
 
-    // Input prompt
-    print!("❯ {}_", state.input);
+    // Input prompt (always show current input line)
+    print!("❯ {}_", state.current_input);
 
     // Move cursor to end of input
-    print!("\x1b[{}C", state.input.len() + 3);
+    print!("\x1b[{}C", state.current_input.len() + 3);
     io::stdout().flush().unwrap();
 }
 
@@ -136,6 +166,9 @@ fn main() -> io::Result<()> {
                             let _ = tx.send(String::from("QUIT"));
                             break;
                         }
+                        '\r' | '\n' => { // Enter
+                            let _ = tx.send(String::from("ENTER"));
+                        }
                         '\x7f' | '\x08' => { // Backspace
                             let _ = tx.send(String::from("BACKSPACE"));
                         }
@@ -170,6 +203,9 @@ fn main() -> io::Result<()> {
             Ok(command) => {
                 if command == "QUIT" {
                     break;
+                } else if command == "ENTER" {
+                    state.submit_current_input();
+                    render_echo_display(&state);
                 } else if command == "BACKSPACE" {
                     state.remove_char();
                     render_echo_display(&state);
@@ -196,7 +232,18 @@ fn main() -> io::Result<()> {
     print!("\x1b[2J\x1b[H");
     io::stdout().flush().unwrap();
     println!("Goodbye!");
-    println!("You typed: \"{}\"", state.input);
+
+    if !state.output_lines.is_empty() || !state.current_input.is_empty() {
+        println!("You typed:");
+        for line in &state.output_lines {
+            println!("  {}", line);
+        }
+        if !state.current_input.is_empty() {
+            println!("  {}", state.current_input);
+        }
+    } else {
+        println!("You typed: (nothing)");
+    }
 
     Ok(())
 }
