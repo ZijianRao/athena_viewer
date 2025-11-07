@@ -17,8 +17,8 @@ fn enable_raw_mode() -> io::Result<termios> {
 
         let mut raw = original_termios;
         raw.c_lflag &= !(ICANON | ECHO); // Disable canonical mode and echo
-        raw.c_cc[VMIN] = 1;   // Wait for at least 1 character
-        raw.c_cc[VTIME] = 0;  // No timeout (immediate)
+        raw.c_cc[VMIN] = 1; // Wait for at least 1 character
+        raw.c_cc[VTIME] = 0; // No timeout (immediate)
 
         if tcsetattr(fd, TCSANOW, &raw) != 0 {
             return Err(io::Error::last_os_error());
@@ -77,7 +77,8 @@ impl EchoState {
         const TERMINAL_HEIGHT: u16 = 24;
         const HEADER_HEIGHT: u16 = 6; // 5 header lines + "Your input:" label
         const SEPARATOR_HEIGHT: u16 = 3; // 2 separator lines + 1 input line
-        const MAX_OUTPUT_LINES: usize = (TERMINAL_HEIGHT - HEADER_HEIGHT - SEPARATOR_HEIGHT) as usize;
+        const MAX_OUTPUT_LINES: usize =
+            (TERMINAL_HEIGHT - HEADER_HEIGHT - SEPARATOR_HEIGHT) as usize;
 
         // Create a list of all lines to display (committed + current)
         let mut all_lines: Vec<String> = self.output_lines.clone();
@@ -93,8 +94,7 @@ impl EchoState {
             all_lines.join("\n")
         }
     }
-
-  }
+}
 
 fn render_echo_display(state: &EchoState) {
     // Clear screen and move to top
@@ -156,7 +156,11 @@ fn render_echo_display(state: &EchoState) {
     print!("❯ {}_", state.current_input);
 
     // Move cursor to correct position in input line
-    print!("\x1b[{};{}H", TOTAL_LINES - 1, 4 + state.current_input.len());
+    print!(
+        "\x1b[{};{}H",
+        TOTAL_LINES - 1,
+        4 + state.current_input.len()
+    );
 
     // Move to bottom separator line (below input)
     print!("\x1b[{};1H", TOTAL_LINES);
@@ -167,7 +171,11 @@ fn render_echo_display(state: &EchoState) {
     }
 
     // Move cursor back to input line
-    print!("\x1b[{};{}H", TOTAL_LINES - 1, 4 + state.current_input.len());
+    print!(
+        "\x1b[{};{}H",
+        TOTAL_LINES - 1,
+        4 + state.current_input.len()
+    );
     io::stdout().flush().unwrap();
 }
 
@@ -199,28 +207,33 @@ fn main() -> io::Result<()> {
                     let ch = buffer[0] as char;
 
                     match ch {
-                        '\x03' => { // Ctrl+C
+                        '\x03' => {
+                            // Ctrl+C
                             let _ = tx.send(String::from("QUIT"));
                             break;
                         }
-                        '\x1b' => { // ESC
+                        '\r' | '\n' => {
+                            // Enter
+                            let _ = tx.send(String::from("ENTER"));
+                        }
+                        '\x7f' | '\x08' => {
+                            // Backspace
+                            let _ = tx.send(String::from("BACKSPACE"));
+                        }
+                        '\x1b' => {
+                            // ESC
                             // Try to read potential escape sequence, but treat as ESC
                             let _ = tx.send(String::from("QUIT"));
                             break;
                         }
-                        '\r' | '\n' => { // Enter
-                            let _ = tx.send(String::from("ENTER"));
-                        }
-                        '\x7f' | '\x08' => { // Backspace
-                            let _ = tx.send(String::from("BACKSPACE"));
-                        }
                         _ => {
-                            // Regular character
+                            // Regular character (including any unhandled control characters)
                             let _ = tx.send(format!("CHAR:{}", ch));
                         }
                     }
                 }
-                Ok(0) => { // EOF
+                Ok(0) => {
+                    // EOF
                     let _ = tx.send(String::from("QUIT"));
                     break;
                 }
@@ -251,8 +264,7 @@ fn main() -> io::Result<()> {
                 } else if command == "BACKSPACE" {
                     state.remove_char();
                     render_echo_display(&state);
-                } else if command.starts_with("CHAR:") {
-                    let ch = &command[5..];
+                } else if let Some(ch) = command.strip_prefix("CHAR:") {
                     let char_to_add = ch.chars().next().unwrap_or('\0');
                     state.add_char(char_to_add);
                     render_echo_display(&state);
