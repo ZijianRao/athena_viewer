@@ -40,6 +40,7 @@ fn disable_raw_mode(fd: i32, original_termios: &termios) -> io::Result<()> {
 struct EchoState {
     current_input: String,
     output_lines: Vec<String>,
+    max_lines: usize,
 }
 
 impl EchoState {
@@ -47,6 +48,7 @@ impl EchoState {
         Self {
             current_input: String::new(),
             output_lines: Vec::new(),
+            max_lines: 5,
         }
     }
 
@@ -62,21 +64,15 @@ impl EchoState {
         if !self.current_input.is_empty() {
             self.output_lines.push(self.current_input.clone());
             self.current_input.clear();
+
+            // Keep only the most recent max_lines
+            if self.output_lines.len() > self.max_lines {
+                self.output_lines.remove(0);
+            }
         }
     }
 
-    fn get_display_output(&self) -> String {
-        if self.output_lines.is_empty() {
-            if self.current_input.is_empty() {
-                String::new()
-            } else {
-                self.current_input.clone()
-            }
-        } else {
-            format!("{}\n{}", self.output_lines.join("\n"), self.current_input)
-        }
-    }
-}
+  }
 
 fn render_echo_display(state: &EchoState) {
     // Clear screen and move to top
@@ -92,22 +88,21 @@ fn render_echo_display(state: &EchoState) {
     println!("=== Interactive Character Echo ===");
     println!("Type characters to see them echoed above instantly");
     println!("Press ESC or Ctrl+C to quit | Enter to submit line | Backspace to delete");
+    println!("(Showing most recent {} lines)", state.max_lines);
     println!();
 
-    // Output area with all history
-    let display_output = state.get_display_output();
-    if !display_output.is_empty() {
-        println!("Your input:");
-        for line in display_output.lines() {
+    // Output area with recent history
+    println!("Your input:");
+    if !state.output_lines.is_empty() {
+        for line in &state.output_lines {
             println!("  {}", line);
         }
     } else {
-        println!("Your input:");
         println!("  (start typing...)");
     }
 
     // Fill remaining output area with empty lines
-    let used_lines = 4 + if display_output.is_empty() { 1 } else { 1 + display_output.lines().count() };
+    let used_lines = 5 + state.output_lines.len(); // 4 header + input + lines
     for _ in 0..(OUTPUT_HEIGHT as usize - used_lines) {
         println!();
     }
