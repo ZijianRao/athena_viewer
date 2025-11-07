@@ -62,19 +62,40 @@ fn render_echo_display(state: &EchoState) {
     print!("\x1b[2J\x1b[H");
     io::stdout().flush().unwrap();
 
+    // Get terminal dimensions (assuming at least 24 lines)
+    const TOTAL_LINES: u16 = 24;
+    const INPUT_HEIGHT: u16 = 3; // Input line + prompt + separator
+    const OUTPUT_HEIGHT: u16 = TOTAL_LINES - INPUT_HEIGHT;
+
     // Header
     println!("=== Interactive Character Echo ===");
     println!("Type characters to see them echoed above instantly");
     println!("Press ESC or Ctrl+C to quit | Backspace to delete");
     println!();
 
-    // Display area
+    // Output area
     println!("Your input:");
     println!("  {}", state.input);
+
+    // Fill remaining output area with empty lines
+    for _ in 0..(OUTPUT_HEIGHT as usize - 6) { // 6 lines used above
+        println!();
+    }
+
+    // Separator line
+    for _ in 0..80 {
+        print!("─");
+    }
     println!();
+
+    // Fixed input area at bottom (move to bottom, then up for input)
+    print!("\x1b[{}A\x1b[G", INPUT_HEIGHT - 1);
 
     // Input prompt
     print!("❯ {}_", state.input);
+
+    // Move cursor to end of input
+    print!("\x1b[{}C", state.input.len() + 3);
     io::stdout().flush().unwrap();
 }
 
