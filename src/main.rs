@@ -72,6 +72,28 @@ impl EchoState {
         }
     }
 
+    fn get_sliding_display_output(&self) -> String {
+        // Calculate available lines in output area (excluding header, "Your input:", and separator area)
+        const TERMINAL_HEIGHT: u16 = 24;
+        const HEADER_HEIGHT: u16 = 6; // 5 header lines + "Your input:" label
+        const SEPARATOR_HEIGHT: u16 = 3; // 2 separator lines + 1 input line
+        const MAX_OUTPUT_LINES: usize = (TERMINAL_HEIGHT - HEADER_HEIGHT - SEPARATOR_HEIGHT) as usize;
+
+        // Create a list of all lines to display (committed + current)
+        let mut all_lines: Vec<String> = self.output_lines.clone();
+        if !self.current_input.is_empty() {
+            all_lines.push(self.current_input.clone());
+        }
+
+        // If we have more lines than can fit, take only the most recent ones
+        if all_lines.len() > MAX_OUTPUT_LINES {
+            let start_idx = all_lines.len() - MAX_OUTPUT_LINES;
+            all_lines[start_idx..].join("\n")
+        } else {
+            all_lines.join("\n")
+        }
+    }
+
   }
 
 fn render_echo_display(state: &EchoState) {
@@ -79,10 +101,8 @@ fn render_echo_display(state: &EchoState) {
     print!("\x1b[2J\x1b[H");
     io::stdout().flush().unwrap();
 
-    // Get terminal dimensions (assuming at least 24 lines)
+    // Terminal layout constants
     const TOTAL_LINES: u16 = 24;
-    const INPUT_HEIGHT: u16 = 4; // Input line + 2 separator lines + buffer
-    const OUTPUT_HEIGHT: u16 = TOTAL_LINES - INPUT_HEIGHT;
 
     // Header
     println!("=== Interactive Character Echo ===");
@@ -91,45 +111,63 @@ fn render_echo_display(state: &EchoState) {
     println!("(Showing most recent {} lines)", state.max_lines);
     println!();
 
-    // Output area - calculate position to place newest line closest to input
-    let available_lines = OUTPUT_HEIGHT as usize - 5; // 4 header lines + "Your input:" line
-    let lines_to_show = state.output_lines.len().min(available_lines);
-    let start_line = state.output_lines.len().saturating_sub(lines_to_show);
+    // Calculate spacing for bottom-aligned display
+    const TERMINAL_HEIGHT: u16 = 24;
+    const HEADER_HEIGHT: u16 = 6; // 5 header lines + "Your input:" label
+    const SEPARATOR_HEIGHT: u16 = 3; // 2 separator lines + 1 input line
+    const MAX_OUTPUT_LINES: usize = (TERMINAL_HEIGHT - HEADER_HEIGHT - SEPARATOR_HEIGHT) as usize;
+
+    // Get the sliding display output (most recent lines at bottom)
+    let display_output = state.get_sliding_display_output();
+    let display_lines: Vec<&str> = display_output.lines().collect();
+    let num_display_lines = display_lines.len();
 
     println!("Your input:");
 
-    // Print empty lines to push output down so newest is close to input
-    let empty_lines_above = available_lines - lines_to_show;
+    // Calculate how many empty lines to add above to push content to bottom
+    let empty_lines_above = MAX_OUTPUT_LINES.saturating_sub(num_display_lines);
     for _ in 0..empty_lines_above {
         println!();
     }
 
-    // Print the actual output lines (oldest first, newest last - closest to input)
-    if start_line < state.output_lines.len() {
-        for line in &state.output_lines[start_line..] {
+    // Display the content (oldest at top, newest at bottom of output area)
+    if !display_output.is_empty() {
+        for line in display_lines {
             println!("  {}", line);
         }
-    } else if state.output_lines.is_empty() {
+    } else {
         println!("  (start typing...)");
     }
 
-    // Two-line separator to bound input area
+    // Move to top separator line (above input)
+    print!("\x1b[{};1H", TOTAL_LINES - 2);
+
+    // Top separator line
     for _ in 0..80 {
         print!("═");
     }
     println!();
 
-    // Empty line for visual separation
-    println!();
+    // Position cursor at input line
+    print!("\x1b[{};1H", TOTAL_LINES - 1);
 
-    // Fixed input area at bottom (move to bottom, then up for input)
-    print!("\x1b[{}A\x1b[G", INPUT_HEIGHT - 2);
-
-    // Input prompt (always show current input line)
+    // Clear input line and show prompt
+    print!("\x1b[K"); // Clear to end of line
     print!("❯ {}_", state.current_input);
 
-    // Move cursor to end of input
-    print!("\x1b[{}C", state.current_input.len() + 3);
+    // Move cursor to correct position in input line
+    print!("\x1b[{};{}H", TOTAL_LINES - 1, 4 + state.current_input.len());
+
+    // Move to bottom separator line (below input)
+    print!("\x1b[{};1H", TOTAL_LINES);
+
+    // Bottom separator line
+    for _ in 0..80 {
+        print!("═");
+    }
+
+    // Move cursor back to input line
+    print!("\x1b[{};{}H", TOTAL_LINES - 1, 4 + state.current_input.len());
     io::stdout().flush().unwrap();
 }
 
@@ -215,7 +253,8 @@ fn main() -> io::Result<()> {
                     render_echo_display(&state);
                 } else if command.starts_with("CHAR:") {
                     let ch = &command[5..];
-                    state.add_char(ch.chars().next().unwrap_or('\0'));
+                    let char_to_add = ch.chars().next().unwrap_or('\0');
+                    state.add_char(char_to_add);
                     render_echo_display(&state);
                 }
             }
