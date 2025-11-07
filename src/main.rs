@@ -81,7 +81,7 @@ fn render_echo_display(state: &EchoState) {
 
     // Get terminal dimensions (assuming at least 24 lines)
     const TOTAL_LINES: u16 = 24;
-    const INPUT_HEIGHT: u16 = 2; // Input line + separator only (reduced gap)
+    const INPUT_HEIGHT: u16 = 4; // Input line + 2 separator lines + buffer
     const OUTPUT_HEIGHT: u16 = TOTAL_LINES - INPUT_HEIGHT;
 
     // Header
@@ -113,14 +113,17 @@ fn render_echo_display(state: &EchoState) {
         println!("  (start typing...)");
     }
 
-    // Separator line (moved closer to input)
+    // Two-line separator to bound input area
     for _ in 0..80 {
-        print!("─");
+        print!("═");
     }
     println!();
 
+    // Empty line for visual separation
+    println!();
+
     // Fixed input area at bottom (move to bottom, then up for input)
-    print!("\x1b[{}A\x1b[G", INPUT_HEIGHT - 1);
+    print!("\x1b[{}A\x1b[G", INPUT_HEIGHT - 2);
 
     // Input prompt (always show current input line)
     print!("❯ {}_", state.current_input);
