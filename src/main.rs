@@ -269,24 +269,8 @@ fn main() -> io::Result<()> {
 
     let _ = input_thread.join();
 
-    // Restore terminal mode and clean up
+    // Restore terminal mode
     let _ = disable_raw_mode(fd, &original_termios);
-
-    print!("\x1b[2J\x1b[H");
-    io::stdout().flush().unwrap();
-    println!("Goodbye!");
-
-    if !state.output_lines.is_empty() || !state.current_input.is_empty() {
-        println!("You typed:");
-        for line in &state.output_lines {
-            println!("  {}", line);
-        }
-        if !state.current_input.is_empty() {
-            println!("  {}", state.current_input);
-        }
-    } else {
-        println!("You typed: (nothing)");
-    }
 
     Ok(())
 }
