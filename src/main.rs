@@ -84,9 +84,10 @@ fn main() -> io::Result<()> {
     let original_termios = match enable_raw_mode() {
         Ok(termios) => termios,
         Err(e) => {
-            println!("Warning: Could not enable raw mode: {}", e);
-            println!("Falling back to line-buffered mode.");
-            return run_fallback_mode();
+            eprintln!("Error: Could not enable raw terminal mode: {}", e);
+            eprintln!("This application requires raw terminal mode to function properly.");
+            eprintln!("Please run in a proper terminal environment.");
+            std::process::exit(1);
         }
     };
 
@@ -170,84 +171,6 @@ fn main() -> io::Result<()> {
 
     // Restore terminal mode and clean up
     let _ = disable_raw_mode(fd, &original_termios);
-
-    print!("\x1b[2J\x1b[H");
-    io::stdout().flush().unwrap();
-    println!("Goodbye!");
-    println!("You typed: \"{}\"", state.input);
-
-    Ok(())
-}
-
-// Fallback mode for environments where raw mode doesn't work
-fn run_fallback_mode() -> io::Result<()> {
-    println!("Running in fallback mode (line-buffered input).");
-    println!("Type characters and press Enter to see them echoed.");
-
-    let mut state = EchoState::new();
-    let (tx, rx) = mpsc::channel();
-
-    // Fallback input thread
-    let input_thread = thread::spawn(move || {
-        loop {
-            let mut input = String::new();
-            match io::stdin().read_line(&mut input) {
-                Ok(0) => {
-                    let _ = tx.send(String::from("QUIT"));
-                    break;
-                }
-                Ok(_) => {
-                    let trimmed = input.trim();
-                    match trimmed {
-                        "q" | "quit" | "ESC" => {
-                            let _ = tx.send(String::from("QUIT"));
-                            break;
-                        }
-                        _ => {
-                            // Echo each character from the input
-                            for ch in trimmed.chars() {
-                                let _ = tx.send(format!("CHAR:{}", ch));
-                            }
-                            // Add a space after each input
-                            let _ = tx.send(String::from("CHAR: "));
-                        }
-                    }
-                }
-                Err(_) => {
-                    let _ = tx.send(String::from("QUIT"));
-                    break;
-                }
-            }
-        }
-    });
-
-    // Initial render
-    render_echo_display(&state);
-
-    loop {
-        match rx.try_recv() {
-            Ok(command) => {
-                if command == "QUIT" {
-                    break;
-                } else if command == "BACKSPACE" {
-                    state.remove_char();
-                    render_echo_display(&state);
-                } else if command.starts_with("CHAR:") {
-                    let ch = &command[5..];
-                    state.add_char(ch.chars().next().unwrap_or('\0'));
-                    render_echo_display(&state);
-                }
-            }
-            Err(mpsc::TryRecvError::Disconnected) => {
-                break;
-            }
-            Err(mpsc::TryRecvError::Empty) => {
-                thread::sleep(Duration::from_millis(50));
-            }
-        }
-    }
-
-    let _ = input_thread.join();
 
     print!("\x1b[2J\x1b[H");
     io::stdout().flush().unwrap();
