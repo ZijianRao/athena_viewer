@@ -81,7 +81,7 @@ fn render_echo_display(state: &EchoState) {
 
     // Get terminal dimensions (assuming at least 24 lines)
     const TOTAL_LINES: u16 = 24;
-    const INPUT_HEIGHT: u16 = 3; // Input line + prompt + separator
+    const INPUT_HEIGHT: u16 = 2; // Input line + separator only (reduced gap)
     const OUTPUT_HEIGHT: u16 = TOTAL_LINES - INPUT_HEIGHT;
 
     // Header
@@ -91,23 +91,29 @@ fn render_echo_display(state: &EchoState) {
     println!("(Showing most recent {} lines)", state.max_lines);
     println!();
 
-    // Output area with recent history
-    println!("Your input:");
-    if !state.output_lines.is_empty() {
-        for line in &state.output_lines {
-            println!("  {}", line);
-        }
-    } else {
-        println!("  (start typing...)");
-    }
+    // Output area - calculate position to place newest line closest to input
+    let available_lines = OUTPUT_HEIGHT as usize - 5; // 4 header lines + "Your input:" line
+    let lines_to_show = state.output_lines.len().min(available_lines);
+    let start_line = state.output_lines.len().saturating_sub(lines_to_show);
 
-    // Fill remaining output area with empty lines
-    let used_lines = 5 + state.output_lines.len(); // 4 header + input + lines
-    for _ in 0..(OUTPUT_HEIGHT as usize - used_lines) {
+    println!("Your input:");
+
+    // Print empty lines to push output down so newest is close to input
+    let empty_lines_above = available_lines - lines_to_show;
+    for _ in 0..empty_lines_above {
         println!();
     }
 
-    // Separator line
+    // Print the actual output lines (oldest first, newest last - closest to input)
+    if start_line < state.output_lines.len() {
+        for line in &state.output_lines[start_line..] {
+            println!("  {}", line);
+        }
+    } else if state.output_lines.is_empty() {
+        println!("  (start typing...)");
+    }
+
+    // Separator line (moved closer to input)
     for _ in 0..80 {
         print!("─");
     }
