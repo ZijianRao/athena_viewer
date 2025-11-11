@@ -10,9 +10,19 @@ use ratatui::{
 };
 
 #[derive(Debug, Default)]
-pub struct App {
+struct App {
     exit: bool,
     list_enabled: bool,
+    input_mode: InputMode,
+    character_index: usize,
+    input: String,
+}
+
+#[derive(Debug, Default)]
+enum InputMode {
+    #[default]
+    Normal,
+    Editing,
 }
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
@@ -31,24 +41,40 @@ impl App {
     }
 
     fn draw(&self, frame: &mut Frame) {
-        let vertical = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]);
-        let [messages_area, help_area] = vertical.areas(frame.area());
+        let vertical = Layout::vertical([
+            Constraint::Min(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ]);
+        let [messages_area, input_area, help_area] = vertical.areas(frame.area());
         self.draw_help_area(help_area, frame);
         self.draw_messages_area(messages_area, frame);
     }
 
     fn draw_help_area(&self, area: Rect, frame: &mut Frame) {
-        let instructions = Text::from(Line::from(vec![
-            " List Folder ".into(),
-            "<Right>".blue().bold(),
-            " Quit ".into(),
-            "<Q> ".blue().bold(),
-        ]));
+        let instructions: Text;
+        match self.input_mode {
+            InputMode::Normal => {
+                instructions = Text::from(Line::from(vec![
+                    " Normal ".bold(),
+                    " Switch Mode ".into(),
+                    "<Tab>".blue().bold(),
+                    " Quit ".into(),
+                    "<Q>".blue().bold(),
+                ]));
+            }
+            InputMode::Editing => {
+                instructions = Text::from(Line::from(vec![
+                    " Editing ".bold(),
+                    " Switch Mode ".into(),
+                    "<Tab>".blue().bold(),
+                ]));
+            }
+        }
         let help_message = Paragraph::new(instructions);
         frame.render_widget(help_message, area);
     }
     fn draw_messages_area(&self, area: Rect, frame: &mut Frame) {
-        let instructions: Paragraph;
         if self.list_enabled {
             let current_dir = env::current_dir().unwrap();
             let entries = fs::read_dir(&current_dir).unwrap();
@@ -63,15 +89,6 @@ impl App {
             let messages = List::new(path_holder)
                 .block(Block::bordered().title(current_dir.to_string_lossy().into_owned()));
             frame.render_widget(messages, area);
-        } else {
-            instructions = Paragraph::new(Text::from(Line::from(vec![
-                " List Folder ".into(),
-                "<Right>".blue().bold(),
-                " Quit ".into(),
-                "<Q> ".blue().bold(),
-            ])))
-            .block(Block::bordered().title("Viewer"));
-            frame.render_widget(instructions, area);
         }
     }
     fn handle_events(&mut self) -> io::Result<()> {
@@ -84,10 +101,18 @@ impl App {
         Ok(())
     }
     fn handle_key_events(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Char('q') => self.exit(),
-            KeyCode::Right => self.list_folder(),
-            _ => {}
+        match self.input_mode {
+            InputMode::Normal => match key_event.code {
+                KeyCode::Char('q') => self.exit(),
+                KeyCode::Tab => self.input_mode = InputMode::Editing,
+                _ => {}
+            },
+            InputMode::Editing => match key_event.code {
+                KeyCode::Tab => self.input_mode = InputMode::Normal,
+                _ => {
+                    self.list_folder();
+                }
+            },
         }
     }
     fn exit(&mut self) {
