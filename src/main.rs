@@ -13,7 +13,6 @@ use tui_input::Input;
 
 #[derive(Debug, Default)]
 struct App {
-    exit: bool,
     input_mode: InputMode,
     input: Input,
 }
