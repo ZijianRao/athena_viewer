@@ -1,24 +1,24 @@
 use std::{env, fs, io};
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
+    crossterm::event::{self, Event, KeyCode},
     layout::{Constraint, Layout, Rect},
-    style::Stylize,
+    style::{Color, Style, Stylize},
     text::{Line, Text},
     widgets::{Block, List, ListItem, Paragraph},
     DefaultTerminal, Frame,
 };
+use tui_input::backend::crossterm::EventHandler;
+use tui_input::Input;
 
 #[derive(Debug, Default)]
 struct App {
     exit: bool,
-    list_enabled: bool,
     input_mode: InputMode,
-    character_index: usize,
-    input: String,
+    input: Input,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 enum InputMode {
     #[default]
     Normal,
@@ -33,21 +33,36 @@ fn main() -> io::Result<()> {
 
 impl App {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        while !self.exit {
+        loop {
             terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events()?;
+            let event = event::read()?;
+            if let Event::Key(key_event) = event {
+                match self.input_mode {
+                    InputMode::Normal => match key_event.code {
+                        KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Tab => self.input_mode = InputMode::Editing,
+                        _ => {}
+                    },
+                    InputMode::Editing => match key_event.code {
+                        KeyCode::Tab => self.input_mode = InputMode::Normal,
+                        _ => {
+                            self.input.handle_event(&event);
+                        }
+                    },
+                }
+            }
         }
-        Ok(())
     }
 
     fn draw(&self, frame: &mut Frame) {
         let vertical = Layout::vertical([
             Constraint::Min(1),
-            Constraint::Length(1),
+            Constraint::Length(3),
             Constraint::Length(1),
         ]);
         let [messages_area, input_area, help_area] = vertical.areas(frame.area());
         self.draw_help_area(help_area, frame);
+        self.draw_input_area(input_area, frame);
         self.draw_messages_area(messages_area, frame);
     }
 
@@ -74,52 +89,47 @@ impl App {
         let help_message = Paragraph::new(instructions);
         frame.render_widget(help_message, area);
     }
-    fn draw_messages_area(&self, area: Rect, frame: &mut Frame) {
-        if self.list_enabled {
-            let current_dir = env::current_dir().unwrap();
-            let entries = fs::read_dir(&current_dir).unwrap();
 
-            let mut path_holder: Vec<ListItem> = Vec::new();
-            for entry in entries {
-                let entry = entry.unwrap();
-                let path = entry.path();
-                let list_item = ListItem::new(Line::from(path.to_string_lossy().into_owned()));
-                path_holder.push(list_item);
-            }
-            let messages = List::new(path_holder)
-                .block(Block::bordered().title(current_dir.to_string_lossy().into_owned()));
-            frame.render_widget(messages, area);
+    fn draw_input_area(&self, area: Rect, frame: &mut Frame) {
+        // keep 2 for boarders and 1 for cursor
+        let width = area.width.max(3) - 3;
+        let scroll = self.input.visual_scroll(width as usize);
+        let style = match self.input_mode {
+            InputMode::Normal => Style::default(),
+            InputMode::Editing => Color::Yellow.into(),
+        };
+
+        let input = Paragraph::new(self.input.value())
+            .style(style)
+            .scroll((0, scroll as u16))
+            .block(Block::bordered().title("Input"));
+        frame.render_widget(input, area);
+
+        // https://github.com/sayanarijit/tui-input/blob/main/examples/ratatui_crossterm_input.rs
+        if self.input_mode == InputMode::Editing {
+            let x = self.input.visual_cursor().max(scroll) - scroll + 1;
+            frame.set_cursor_position((area.x + x as u16, area.y + 1));
         }
     }
-    fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_events(key_event)
+
+    fn draw_messages_area(&self, area: Rect, frame: &mut Frame) {
+        match self.input_mode {
+            InputMode::Editing => {
+                let current_dir = env::current_dir().unwrap();
+                let entries = fs::read_dir(&current_dir).unwrap();
+
+                let mut path_holder: Vec<ListItem> = Vec::new();
+                for entry in entries {
+                    let entry = entry.unwrap();
+                    let path = entry.path();
+                    let list_item = ListItem::new(Line::from(path.to_string_lossy().into_owned()));
+                    path_holder.push(list_item);
+                }
+                let messages = List::new(path_holder)
+                    .block(Block::bordered().title(current_dir.to_string_lossy().into_owned()));
+                frame.render_widget(messages, area);
             }
             _ => {}
         }
-        Ok(())
-    }
-    fn handle_key_events(&mut self, key_event: KeyEvent) {
-        match self.input_mode {
-            InputMode::Normal => match key_event.code {
-                KeyCode::Char('q') => self.exit(),
-                KeyCode::Tab => self.input_mode = InputMode::Editing,
-                _ => {}
-            },
-            InputMode::Editing => match key_event.code {
-                KeyCode::Tab => self.input_mode = InputMode::Normal,
-                _ => {
-                    self.list_folder();
-                }
-            },
-        }
-    }
-    fn exit(&mut self) {
-        self.exit = true;
-    }
-
-    fn list_folder(&mut self) {
-        self.list_enabled = true;
     }
 }
