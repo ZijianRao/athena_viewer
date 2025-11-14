@@ -17,6 +17,11 @@ struct App {
     input: Input,
 }
 
+#[derive(Debug, Default)]
+struct MessageHolder {
+    messages: Vec<String>,
+}
+
 #[derive(Debug, Default, PartialEq)]
 enum InputMode {
     #[default]
@@ -130,5 +135,35 @@ impl App {
             }
             _ => {}
         }
+    }
+}
+
+impl MessageHolder {
+    fn update(&mut self, latest_char: Option<char>) {
+        match latest_char {
+            None => self.update_directory(),
+            Some(char) => {}
+        }
+    }
+
+    fn update_directory(&mut self) {
+        let current_dir = env::current_dir().unwrap();
+        let entries = fs::read_dir(&current_dir).unwrap();
+
+        for entry in entries {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            self.messages.push(path.to_string_lossy().into_owned());
+        }
+    }
+
+    fn draw(&self, area: Rect, frame: &mut Frame) {
+        let mut path_holder: Vec<ListItem> = Vec::new();
+        for entry in &self.messages {
+            let list_item = ListItem::new(Line::from(entry.clone()));
+            path_holder.push(list_item);
+        }
+        let messages = List::new(path_holder).block(Block::bordered().title("Directory"));
+        frame.render_widget(messages, area);
     }
 }
