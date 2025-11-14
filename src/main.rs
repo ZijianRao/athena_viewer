@@ -15,6 +15,7 @@ use tui_input::Input;
 struct App {
     input_mode: InputMode,
     input: Input,
+    message_holder: MessageHolder,
 }
 
 #[derive(Debug, Default)]
@@ -51,6 +52,8 @@ impl App {
                         KeyCode::Tab => self.input_mode = InputMode::Normal,
                         _ => {
                             self.input.handle_event(&event);
+                            self.message_holder
+                                .update(self.input.value().chars().last());
                         }
                     },
                 }
@@ -67,7 +70,7 @@ impl App {
         let [messages_area, input_area, help_area] = vertical.areas(frame.area());
         self.draw_help_area(help_area, frame);
         self.draw_input_area(input_area, frame);
-        self.draw_messages_area(messages_area, frame);
+        self.message_holder.draw(messages_area, frame);
     }
 
     fn draw_help_area(&self, area: Rect, frame: &mut Frame) {
@@ -115,27 +118,6 @@ impl App {
             frame.set_cursor_position((area.x + x as u16, area.y + 1));
         }
     }
-
-    fn draw_messages_area(&self, area: Rect, frame: &mut Frame) {
-        match self.input_mode {
-            InputMode::Editing => {
-                let current_dir = env::current_dir().unwrap();
-                let entries = fs::read_dir(&current_dir).unwrap();
-
-                let mut path_holder: Vec<ListItem> = Vec::new();
-                for entry in entries {
-                    let entry = entry.unwrap();
-                    let path = entry.path();
-                    let list_item = ListItem::new(Line::from(path.to_string_lossy().into_owned()));
-                    path_holder.push(list_item);
-                }
-                let messages = List::new(path_holder)
-                    .block(Block::bordered().title(current_dir.to_string_lossy().into_owned()));
-                frame.render_widget(messages, area);
-            }
-            _ => {}
-        }
-    }
 }
 
 impl MessageHolder {
@@ -158,11 +140,11 @@ impl MessageHolder {
     }
 
     fn draw(&self, area: Rect, frame: &mut Frame) {
-        let mut path_holder: Vec<ListItem> = Vec::new();
-        for entry in &self.messages {
-            let list_item = ListItem::new(Line::from(entry.clone()));
-            path_holder.push(list_item);
-        }
+        let path_holder: Vec<ListItem> = self
+            .messages
+            .iter()
+            .map(|entry| ListItem::new(Line::from(entry.clone())))
+            .collect();
         let messages = List::new(path_holder).block(Block::bordered().title("Directory"));
         frame.render_widget(messages, area);
     }
