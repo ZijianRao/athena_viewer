@@ -45,15 +45,21 @@ impl App {
                 match self.input_mode {
                     InputMode::Normal => match key_event.code {
                         KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Tab => self.input_mode = InputMode::Editing,
+                        KeyCode::Tab => {
+                            self.input_mode = InputMode::Editing;
+                            self.message_holder.update_directory();
+                        }
                         _ => {}
                     },
                     InputMode::Editing => match key_event.code {
                         KeyCode::Tab => self.input_mode = InputMode::Normal,
                         _ => {
                             self.input.handle_event(&event);
-                            self.message_holder
-                                .update(self.input.value().chars().last());
+                            let latest_char = self.input.value().chars().last();
+                            match latest_char {
+                                Some(char) => self.message_holder.update(char),
+                                None => {}
+                            }
                         }
                     },
                 }
@@ -121,12 +127,7 @@ impl App {
 }
 
 impl MessageHolder {
-    fn update(&mut self, latest_char: Option<char>) {
-        match latest_char {
-            None => self.update_directory(),
-            Some(char) => {}
-        }
-    }
+    fn update(&mut self, latest_char: char) {}
 
     fn update_directory(&mut self) {
         let current_dir = env::current_dir().unwrap();
