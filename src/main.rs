@@ -21,6 +21,8 @@ struct App {
 #[derive(Debug, Default)]
 struct MessageHolder {
     messages: Vec<String>,
+    current_directory: String,
+    input: String,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -55,11 +57,7 @@ impl App {
                         KeyCode::Tab => self.input_mode = InputMode::Normal,
                         _ => {
                             self.input.handle_event(&event);
-                            let latest_char = self.input.value().chars().last();
-                            match latest_char {
-                                Some(char) => self.message_holder.update(char),
-                                None => {}
-                            }
+                            self.message_holder.update(self.input.value());
                         }
                     },
                 }
@@ -127,16 +125,25 @@ impl App {
 }
 
 impl MessageHolder {
-    fn update(&mut self, latest_char: char) {}
+    fn update(&mut self, input: &str) {
+        self.input = input.to_string();
+    }
 
     fn update_directory(&mut self) {
         let current_dir = env::current_dir().unwrap();
+        self.current_directory = current_dir.to_string_lossy().into_owned();
         let entries = fs::read_dir(&current_dir).unwrap();
 
+        self.messages.clear();
         for entry in entries {
             let entry = entry.unwrap();
             let path = entry.path();
-            self.messages.push(path.to_string_lossy().into_owned());
+            self.messages.push(
+                path.file_name()
+                    .expect("Unable to get file name")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
         }
     }
 
@@ -144,9 +151,35 @@ impl MessageHolder {
         let path_holder: Vec<ListItem> = self
             .messages
             .iter()
+            .filter(|entry| self.should_select(entry))
             .map(|entry| ListItem::new(Line::from(entry.clone())))
             .collect();
-        let messages = List::new(path_holder).block(Block::bordered().title("Directory"));
+        let messages =
+            List::new(path_holder).block(Block::bordered().title(self.current_directory.clone()));
         frame.render_widget(messages, area);
+    }
+
+    fn should_select(&self, name: &str) -> bool {
+        if self.input.is_empty() {
+            return true;
+        }
+
+        let mut counter = 0;
+        for char in name.chars() {
+            if char.eq_ignore_ascii_case(
+                &self
+                    .input
+                    .chars()
+                    .nth(counter)
+                    .expect("Should not reach out of bounds"),
+            ) {
+                counter += 1;
+            }
+            if counter == self.input.len() {
+                return true;
+            }
+        }
+
+        false
     }
 }
