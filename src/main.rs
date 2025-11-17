@@ -8,6 +8,7 @@ use ratatui::{
     widgets::{Block, List, ListItem, Paragraph},
     DefaultTerminal, Frame,
 };
+use std::path::PathBuf;
 use tui_input::backend::crossterm::EventHandler;
 use tui_input::Input;
 
@@ -49,12 +50,16 @@ impl App {
                         KeyCode::Char('q') => return Ok(()),
                         KeyCode::Tab => {
                             self.input_mode = InputMode::Editing;
-                            self.message_holder.update_directory();
+                            self.message_holder.setup();
                         }
                         _ => {}
                     },
                     InputMode::Editing => match key_event.code {
                         KeyCode::Tab => self.input_mode = InputMode::Normal,
+                        KeyCode::Enter => {
+                            self.message_holder.submit();
+                            self.input.reset();
+                        }
                         _ => {
                             self.input.handle_event(&event);
                             self.message_holder.update(self.input.value());
@@ -129,22 +134,40 @@ impl MessageHolder {
         self.input = input.to_string();
     }
 
-    fn update_directory(&mut self) {
-        let current_dir = env::current_dir().unwrap();
-        self.current_directory = current_dir.to_string_lossy().into_owned();
-        let entries = fs::read_dir(&current_dir).unwrap();
+    fn setup(&mut self) {
+        let current_directory = env::current_dir().unwrap().to_string_lossy().into_owned();
+        // let current_directory = String::from("/");
+        self.messages = self.get_child_filename_group(&current_directory);
+        self.current_directory = current_directory;
+    }
 
-        self.messages.clear();
-        for entry in entries {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            self.messages.push(
-                path.file_name()
-                    .expect("Unable to get file name")
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-        }
+    fn submit(&mut self) {
+        // assume a new folder will be opened
+        // self.input = input.to_string();
+        let mut path_holder: Vec<String> = std::mem::take(&mut self.messages)
+            .into_iter()
+            .filter(|entry| self.should_select(entry))
+            .collect();
+        assert_eq!(path_holder.len(), 1);
+
+        let filename = path_holder.pop().unwrap();
+        let new_current_directory = format!("{}/{}", self.current_directory, filename);
+        self.messages = self.get_child_filename_group(&new_current_directory);
+        self.current_directory = new_current_directory;
+        self.input = String::new();
+    }
+
+    fn get_child_filename_group(&self, path: &str) -> Vec<String> {
+        fs::read_dir(&PathBuf::from(path))
+            .unwrap()
+            .filter_map(|entry| {
+                entry.ok().and_then(|e| {
+                    e.path()
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                })
+            })
+            .collect()
     }
 
     fn draw(&self, area: Rect, frame: &mut Frame) {
