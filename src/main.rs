@@ -21,9 +21,16 @@ struct App {
 
 #[derive(Debug, Default)]
 struct MessageHolder {
-    messages: Vec<String>,
+    messages: Vec<FileHolder>,
     current_directory: String,
     input: String,
+}
+
+#[derive(Debug)]
+struct FileHolder {
+    file_name: String,
+    is_file: bool,
+    parent_folder: PathBuf,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -129,6 +136,21 @@ impl App {
     }
 }
 
+impl From<PathBuf> for FileHolder {
+    fn from(path: PathBuf) -> Self {
+        let file_name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap();
+
+        FileHolder {
+            file_name: file_name,
+            is_file: path.is_file(),
+            parent_folder: path.parent().unwrap().to_path_buf(),
+        }
+    }
+}
+
 impl MessageHolder {
     fn update(&mut self, input: &str) {
         self.input = input.to_string();
@@ -144,29 +166,23 @@ impl MessageHolder {
     fn submit(&mut self) {
         // assume a new folder will be opened
         // self.input = input.to_string();
-        let mut path_holder: Vec<String> = std::mem::take(&mut self.messages)
+        let mut path_holder: Vec<FileHolder> = std::mem::take(&mut self.messages)
             .into_iter()
-            .filter(|entry| self.should_select(entry))
+            .filter(|entry| self.should_select(&entry.file_name))
             .collect();
         assert_eq!(path_holder.len(), 1);
 
-        let filename = path_holder.pop().unwrap();
+        let filename = path_holder.pop().unwrap().file_name;
         let new_current_directory = format!("{}/{}", self.current_directory, filename);
         self.messages = self.get_child_filename_group(&new_current_directory);
         self.current_directory = new_current_directory;
         self.input = String::new();
     }
 
-    fn get_child_filename_group(&self, path: &str) -> Vec<String> {
+    fn get_child_filename_group(&self, path: &str) -> Vec<FileHolder> {
         fs::read_dir(&PathBuf::from(path))
             .unwrap()
-            .filter_map(|entry| {
-                entry.ok().and_then(|e| {
-                    e.path()
-                        .file_name()
-                        .map(|name| name.to_string_lossy().into_owned())
-                })
-            })
+            .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path())))
             .collect()
     }
 
@@ -174,8 +190,14 @@ impl MessageHolder {
         let path_holder: Vec<ListItem> = self
             .messages
             .iter()
-            .filter(|entry| self.should_select(entry))
-            .map(|entry| ListItem::new(Line::from(entry.clone())))
+            .filter(|entry| self.should_select(&entry.file_name))
+            .map(|entry| {
+                ListItem::new(Line::from(entry.file_name.clone()).style(if entry.is_file {
+                    Style::default()
+                } else {
+                    Color::LightCyan.into()
+                }))
+            })
             .collect();
         let messages =
             List::new(path_holder).block(Block::bordered().title(self.current_directory.clone()));
