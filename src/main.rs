@@ -24,6 +24,7 @@ struct MessageHolder {
     messages: Vec<FileHolder>,
     current_directory: String,
     input: String,
+    file_pending: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -83,6 +84,7 @@ impl App {
             Constraint::Length(3),
             Constraint::Length(1),
         ]);
+
         let [messages_area, input_area, help_area] = vertical.areas(frame.area());
         self.draw_help_area(help_area, frame);
         self.draw_input_area(input_area, frame);
@@ -173,10 +175,15 @@ impl MessageHolder {
         assert_eq!(path_holder.len(), 1);
 
         let filename = path_holder.pop().unwrap().file_name;
-        let new_current_directory = format!("{}/{}", self.current_directory, filename);
-        self.messages = self.get_child_filename_group(&new_current_directory);
-        self.current_directory = new_current_directory;
-        self.input = String::new();
+        let new_entrypoint = format!("{}/{}", self.current_directory, filename);
+        let new_entrypoint_path = PathBuf::from(new_entrypoint.clone());
+        if new_entrypoint_path.is_dir() {
+            self.messages = self.get_child_filename_group(&new_entrypoint);
+            self.current_directory = new_entrypoint;
+            self.input = String::new();
+        } else {
+            self.file_pending = Some(new_entrypoint_path);
+        }
     }
 
     fn get_child_filename_group(&self, path: &str) -> Vec<FileHolder> {
@@ -187,6 +194,16 @@ impl MessageHolder {
     }
 
     fn draw(&self, area: Rect, frame: &mut Frame) {
+        match &self.file_pending {
+            None => self.draw_filter(area, frame),
+            Some(file_path) => {
+                self.draw_file(area, frame, file_path);
+                // self.file_pending = None;
+            }
+        }
+    }
+
+    fn draw_filter(&self, area: Rect, frame: &mut Frame) {
         let path_holder: Vec<ListItem> = self
             .messages
             .iter()
@@ -201,6 +218,14 @@ impl MessageHolder {
             .collect();
         let messages =
             List::new(path_holder).block(Block::bordered().title(self.current_directory.clone()));
+        frame.render_widget(messages, area);
+    }
+
+    fn draw_file(&self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
+        // let horizontal = Layout::horizontal([Constraint::Ratio(1, 3); 2]);
+        // let [left, right] = horizontal.areas(area);
+        let messages = Paragraph::new(file_path.to_string_lossy().into_owned())
+            .block(Block::bordered().title(self.current_directory.clone()));
         frame.render_widget(messages, area);
     }
 
