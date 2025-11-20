@@ -1,4 +1,7 @@
-use std::{env, fs, io};
+use std::{
+    env, fs,
+    io::{self, BufRead, BufReader},
+};
 
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
@@ -24,7 +27,7 @@ struct MessageHolder {
     messages: Vec<FileHolder>,
     current_directory: String,
     input: String,
-    file_pending: Option<PathBuf>,
+    file_to_read: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -55,7 +58,12 @@ impl App {
             if let Event::Key(key_event) = event {
                 match self.input_mode {
                     InputMode::Normal => match key_event.code {
-                        KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Char('q') => match self.message_holder.file_to_read {
+                            None => return Ok(()),
+                            _ => {
+                                self.message_holder.reset();
+                            }
+                        },
                         KeyCode::Tab => {
                             self.input_mode = InputMode::Editing;
                             self.message_holder.setup();
@@ -158,6 +166,11 @@ impl MessageHolder {
         self.input = input.to_string();
     }
 
+    fn reset(&mut self) {
+        self.input.clear();
+        self.file_to_read = None;
+    }
+
     fn setup(&mut self) {
         let current_directory = env::current_dir().unwrap().to_string_lossy().into_owned();
         // let current_directory = String::from("/");
@@ -166,15 +179,13 @@ impl MessageHolder {
     }
 
     fn submit(&mut self) {
-        // assume a new folder will be opened
-        // self.input = input.to_string();
-        let mut path_holder: Vec<FileHolder> = std::mem::take(&mut self.messages)
+        let path_holder: Vec<FileHolder> = std::mem::take(&mut self.messages)
             .into_iter()
             .filter(|entry| self.should_select(&entry.file_name))
             .collect();
-        assert_eq!(path_holder.len(), 1);
+        assert!(!path_holder.is_empty());
 
-        let filename = path_holder.pop().unwrap().file_name;
+        let filename = &path_holder[0].file_name;
         let new_entrypoint = format!("{}/{}", self.current_directory, filename);
         let new_entrypoint_path = PathBuf::from(new_entrypoint.clone());
         if new_entrypoint_path.is_dir() {
@@ -182,7 +193,7 @@ impl MessageHolder {
             self.current_directory = new_entrypoint;
             self.input = String::new();
         } else {
-            self.file_pending = Some(new_entrypoint_path);
+            self.file_to_read = Some(new_entrypoint_path);
         }
     }
 
@@ -194,11 +205,10 @@ impl MessageHolder {
     }
 
     fn draw(&self, area: Rect, frame: &mut Frame) {
-        match &self.file_pending {
+        match &self.file_to_read {
             None => self.draw_filter(area, frame),
             Some(file_path) => {
                 self.draw_file(area, frame, file_path);
-                // self.file_pending = None;
             }
         }
     }
@@ -222,11 +232,21 @@ impl MessageHolder {
     }
 
     fn draw_file(&self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
-        // let horizontal = Layout::horizontal([Constraint::Ratio(1, 3); 2]);
-        // let [left, right] = horizontal.areas(area);
+        let horizontal = Layout::horizontal([Constraint::Ratio(1, 2); 2]);
+        let [left, right] = horizontal.areas(area);
+
         let messages = Paragraph::new(file_path.to_string_lossy().into_owned())
             .block(Block::bordered().title(self.current_directory.clone()));
-        frame.render_widget(messages, area);
+
+        let file = fs::File::open(file_path).unwrap();
+        let reader = BufReader::new(file);
+
+        let lines: Result<Vec<String>, _> = reader.lines().take(30).collect();
+        let text = lines.unwrap().join("\n");
+        let file_preview = Paragraph::new(text).block(Block::bordered());
+
+        frame.render_widget(messages, left);
+        frame.render_widget(file_preview, right);
     }
 
     fn should_select(&self, name: &str) -> bool {
