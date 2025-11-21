@@ -1,5 +1,6 @@
 use std::{
-    env, fs,
+    env,
+    fs::{self, File},
     io::{self, BufRead, BufReader},
 };
 
@@ -41,7 +42,8 @@ struct FileHolder {
 enum InputMode {
     #[default]
     Normal,
-    Editing,
+    FileSearch,
+    FileView,
 }
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
@@ -57,23 +59,28 @@ impl App {
             let event = event::read()?;
             if let Event::Key(key_event) = event {
                 match self.input_mode {
+                    InputMode::FileView => match key_event.code {
+                        KeyCode::Char('q') => {
+                            self.message_holder.reset();
+                            self.input_mode = InputMode::FileSearch;
+                        }
+                        _ => (),
+                    },
                     InputMode::Normal => match key_event.code {
-                        KeyCode::Char('q') => match self.message_holder.file_to_read {
-                            None => return Ok(()),
-                            _ => {
-                                self.message_holder.reset();
-                            }
-                        },
+                        KeyCode::Char('q') => return Ok(()),
                         KeyCode::Tab => {
-                            self.input_mode = InputMode::Editing;
+                            self.input_mode = InputMode::FileSearch;
                             self.message_holder.setup();
                         }
                         _ => {}
                     },
-                    InputMode::Editing => match key_event.code {
+                    InputMode::FileSearch => match key_event.code {
                         KeyCode::Tab => self.input_mode = InputMode::Normal,
                         KeyCode::Enter => {
                             self.message_holder.submit();
+                            if self.message_holder.file_to_read.is_some() {
+                                self.input_mode = InputMode::FileView;
+                            }
                             self.input.reset();
                         }
                         _ => {
@@ -111,11 +118,18 @@ impl App {
                     "<Q>".blue().bold(),
                 ]));
             }
-            InputMode::Editing => {
+            InputMode::FileSearch => {
                 instructions = Text::from(Line::from(vec![
-                    " Editing ".bold(),
+                    " FileSearch ".bold(),
                     " Switch Mode ".into(),
                     "<Tab>".blue().bold(),
+                ]));
+            }
+            InputMode::FileView => {
+                instructions = Text::from(Line::from(vec![
+                    " FileView".bold(),
+                    " Quit ".into(),
+                    "<Q>".blue().bold(),
                 ]));
             }
         }
@@ -128,8 +142,8 @@ impl App {
         let width = area.width.max(3) - 3;
         let scroll = self.input.visual_scroll(width as usize);
         let style = match self.input_mode {
-            InputMode::Normal => Style::default(),
-            InputMode::Editing => Color::Yellow.into(),
+            InputMode::FileSearch => Color::Yellow.into(),
+            _ => Style::default(),
         };
 
         let input = Paragraph::new(self.input.value())
@@ -139,7 +153,7 @@ impl App {
         frame.render_widget(input, area);
 
         // https://github.com/sayanarijit/tui-input/blob/main/examples/ratatui_crossterm_input.rs
-        if self.input_mode == InputMode::Editing {
+        if self.input_mode == InputMode::FileSearch {
             let x = self.input.visual_cursor().max(scroll) - scroll + 1;
             frame.set_cursor_position((area.x + x as u16, area.y + 1));
         }
@@ -169,6 +183,7 @@ impl MessageHolder {
     fn reset(&mut self) {
         self.input.clear();
         self.file_to_read = None;
+        self.setup();
     }
 
     fn setup(&mut self) {
@@ -198,22 +213,37 @@ impl MessageHolder {
     }
 
     fn get_child_filename_group(&self, path: &str) -> Vec<FileHolder> {
-        fs::read_dir(&PathBuf::from(path))
-            .unwrap()
-            .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path())))
-            .collect()
+        let path_buf = PathBuf::from(path);
+        let mut entries = Vec::new();
+
+        // add if not at root
+        if let Some(parent) = path_buf.parent() {
+            entries.push(FileHolder {
+                file_name: "..".to_string(),
+                is_file: false,
+                parent_folder: parent.to_path_buf(), // BUG: incorrect parent of parent
+            })
+        }
+
+        entries.extend(
+            fs::read_dir(&path_buf)
+                .unwrap()
+                .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path()))),
+        );
+
+        entries
     }
 
     fn draw(&self, area: Rect, frame: &mut Frame) {
         match &self.file_to_read {
-            None => self.draw_filter(area, frame),
+            None => self.draw_file_view_search(area, frame),
             Some(file_path) => {
-                self.draw_file(area, frame, file_path);
+                self.draw_file_view(area, frame, file_path);
             }
         }
     }
 
-    fn draw_filter(&self, area: Rect, frame: &mut Frame) {
+    fn draw_file_view_search(&self, area: Rect, frame: &mut Frame) {
         let path_holder: Vec<ListItem> = self
             .messages
             .iter()
@@ -231,7 +261,7 @@ impl MessageHolder {
         frame.render_widget(messages, area);
     }
 
-    fn draw_file(&self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
+    fn draw_file_view(&self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
         let horizontal = Layout::horizontal([Constraint::Ratio(1, 2); 2]);
         let [left, right] = horizontal.areas(area);
 
@@ -241,8 +271,12 @@ impl MessageHolder {
         let file = fs::File::open(file_path).unwrap();
         let reader = BufReader::new(file);
 
-        let lines: Result<Vec<String>, _> = reader.lines().take(30).collect();
-        let text = lines.unwrap().join("\n");
+        let lines_result: Result<Vec<String>, _> = reader.lines().take(30).collect();
+        let text: String;
+        match lines_result {
+            Ok(lines) => text = lines.join("\n"),
+            Err(_) => text = "Unable to read...".to_string(),
+        }
         let file_preview = Paragraph::new(text).block(Block::bordered());
 
         frame.render_widget(messages, left);
