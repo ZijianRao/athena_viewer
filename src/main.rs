@@ -187,10 +187,11 @@ impl MessageHolder {
     }
 
     fn setup(&mut self) {
-        let current_directory = env::current_dir().unwrap().to_string_lossy().into_owned();
+        if self.current_directory.is_empty() {
+            self.current_directory = env::current_dir().unwrap().to_string_lossy().into_owned();
+        }
         // let current_directory = String::from("/");
-        self.messages = self.get_child_filename_group(&current_directory);
-        self.current_directory = current_directory;
+        self.messages = self.get_directory_files(&self.current_directory);
     }
 
     fn submit(&mut self) {
@@ -204,7 +205,7 @@ impl MessageHolder {
         let new_entrypoint = format!("{}/{}", self.current_directory, filename);
         let new_entrypoint_path = PathBuf::from(new_entrypoint.clone());
         if new_entrypoint_path.is_dir() {
-            self.messages = self.get_child_filename_group(&new_entrypoint);
+            self.messages = self.get_directory_files(&new_entrypoint);
             self.current_directory = new_entrypoint;
             self.input = String::new();
         } else {
@@ -212,7 +213,7 @@ impl MessageHolder {
         }
     }
 
-    fn get_child_filename_group(&self, path: &str) -> Vec<FileHolder> {
+    fn get_directory_files(&self, path: &str) -> Vec<FileHolder> {
         let path_buf = PathBuf::from(path);
         let mut entries = Vec::new();
 
