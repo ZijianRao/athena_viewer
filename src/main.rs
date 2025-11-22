@@ -1,7 +1,7 @@
 use std::{
     env,
-    fs::{self, File},
-    io::{self, BufRead, BufReader},
+    fs::{self},
+    io::{self},
 };
 
 use ratatui::{
@@ -28,7 +28,8 @@ struct MessageHolder {
     messages: Vec<FileHolder>,
     current_directory: String,
     input: String,
-    file_to_read: Option<PathBuf>,
+    file_opened: Option<PathBuf>,
+    file_text: String,
 }
 
 #[derive(Debug)]
@@ -64,6 +65,9 @@ impl App {
                             self.message_holder.reset();
                             self.input_mode = InputMode::FileSearch;
                         }
+                        KeyCode::PageDown => {
+                            // self.message_holder
+                        }
                         _ => (),
                     },
                     InputMode::Normal => match key_event.code {
@@ -78,7 +82,7 @@ impl App {
                         KeyCode::Tab => self.input_mode = InputMode::Normal,
                         KeyCode::Enter => {
                             self.message_holder.submit();
-                            if self.message_holder.file_to_read.is_some() {
+                            if self.message_holder.file_opened.is_some() {
                                 self.input_mode = InputMode::FileView;
                             }
                             self.input.reset();
@@ -182,7 +186,8 @@ impl MessageHolder {
 
     fn reset(&mut self) {
         self.input.clear();
-        self.file_to_read = None;
+        self.file_opened = None;
+        self.file_text.clear();
         self.setup();
     }
 
@@ -209,7 +214,11 @@ impl MessageHolder {
             self.current_directory = new_entrypoint;
             self.input = String::new();
         } else {
-            self.file_to_read = Some(new_entrypoint_path);
+            match fs::read_to_string(&new_entrypoint_path) {
+                Ok(text) => self.file_text = text,
+                Err(_) => self.file_text = "Unable to read...".to_string(),
+            }
+            self.file_opened = Some(new_entrypoint_path);
         }
     }
 
@@ -236,7 +245,7 @@ impl MessageHolder {
     }
 
     fn draw(&self, area: Rect, frame: &mut Frame) {
-        match &self.file_to_read {
+        match &self.file_opened {
             None => self.draw_file_view_search(area, frame),
             Some(file_path) => {
                 self.draw_file_view(area, frame, file_path);
@@ -269,16 +278,7 @@ impl MessageHolder {
         let messages = Paragraph::new(file_path.to_string_lossy().into_owned())
             .block(Block::bordered().title(self.current_directory.clone()));
 
-        let file = fs::File::open(file_path).unwrap();
-        let reader = BufReader::new(file);
-
-        let lines_result: Result<Vec<String>, _> = reader.lines().take(30).collect();
-        let text: String;
-        match lines_result {
-            Ok(lines) => text = lines.join("\n"),
-            Err(_) => text = "Unable to read...".to_string(),
-        }
-        let file_preview = Paragraph::new(text).block(Block::bordered());
+        let file_preview = Paragraph::new(self.file_text.clone()).block(Block::bordered());
 
         frame.render_widget(messages, left);
         frame.render_widget(file_preview, right);
