@@ -1,15 +1,17 @@
+use std::time::{Duration, Instant};
 use std::{
     env,
     fs::{self},
     io::{self},
 };
 
+use ratatui::symbols::scrollbar;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Text},
-    widgets::{Block, List, ListItem, Paragraph},
+    widgets::{Block, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     DefaultTerminal, Frame,
 };
 use std::path::PathBuf;
@@ -30,6 +32,10 @@ struct MessageHolder {
     input: String,
     file_opened: Option<PathBuf>,
     file_text: String,
+    vertical_scroll_state: ScrollbarState,
+    horizontal_scroll_state: ScrollbarState,
+    vertical_scroll: usize,
+    horizontal_scroll: usize,
 }
 
 #[derive(Debug)]
@@ -55,49 +61,88 @@ fn main() -> io::Result<()> {
 
 impl App {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+        let tick_rate = Duration::from_millis(250);
+        let mut last_tick = Instant::now();
+
         loop {
             terminal.draw(|frame| self.draw(frame))?;
-            let event = event::read()?;
-            if let Event::Key(key_event) = event {
-                match self.input_mode {
-                    InputMode::FileView => match key_event.code {
-                        KeyCode::Char('q') => {
-                            self.message_holder.reset();
-                            self.input_mode = InputMode::FileSearch;
-                        }
-                        KeyCode::PageDown => {
-                            // self.message_holder
-                        }
-                        _ => (),
-                    },
-                    InputMode::Normal => match key_event.code {
-                        KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Tab => {
-                            self.input_mode = InputMode::FileSearch;
-                            self.message_holder.setup();
-                        }
-                        _ => {}
-                    },
-                    InputMode::FileSearch => match key_event.code {
-                        KeyCode::Tab => self.input_mode = InputMode::Normal,
-                        KeyCode::Enter => {
-                            self.message_holder.submit();
-                            if self.message_holder.file_opened.is_some() {
-                                self.input_mode = InputMode::FileView;
+            let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+
+            if event::poll(timeout)? {
+                let event = event::read()?;
+                if let Event::Key(key_event) = event {
+                    match self.input_mode {
+                        InputMode::FileView => match key_event.code {
+                            KeyCode::Char('q') => {
+                                self.message_holder.reset();
+                                self.input_mode = InputMode::FileSearch;
                             }
-                            self.input.reset();
-                        }
-                        _ => {
-                            self.input.handle_event(&event);
-                            self.message_holder.update(self.input.value());
-                        }
-                    },
+                            KeyCode::Char('j') | KeyCode::Down => {
+                                self.message_holder.vertical_scroll =
+                                    self.message_holder.vertical_scroll.saturating_add(1);
+                                self.message_holder.vertical_scroll_state = self
+                                    .message_holder
+                                    .vertical_scroll_state
+                                    .position(self.message_holder.vertical_scroll);
+                            }
+                            KeyCode::Char('k') | KeyCode::Up => {
+                                self.message_holder.vertical_scroll =
+                                    self.message_holder.vertical_scroll.saturating_sub(1);
+                                self.message_holder.vertical_scroll_state = self
+                                    .message_holder
+                                    .vertical_scroll_state
+                                    .position(self.message_holder.vertical_scroll);
+                            }
+                            KeyCode::Char('h') | KeyCode::Left => {
+                                self.message_holder.horizontal_scroll =
+                                    self.message_holder.horizontal_scroll.saturating_sub(1);
+                                self.message_holder.horizontal_scroll_state = self
+                                    .message_holder
+                                    .horizontal_scroll_state
+                                    .position(self.message_holder.horizontal_scroll);
+                            }
+                            KeyCode::Char('l') | KeyCode::Right => {
+                                self.message_holder.horizontal_scroll =
+                                    self.message_holder.horizontal_scroll.saturating_add(1);
+                                self.message_holder.horizontal_scroll_state = self
+                                    .message_holder
+                                    .horizontal_scroll_state
+                                    .position(self.message_holder.horizontal_scroll);
+                            }
+                            _ => (),
+                        },
+                        InputMode::Normal => match key_event.code {
+                            KeyCode::Char('q') => return Ok(()),
+                            KeyCode::Tab => {
+                                self.input_mode = InputMode::FileSearch;
+                                self.message_holder.setup();
+                            }
+                            _ => {}
+                        },
+                        InputMode::FileSearch => match key_event.code {
+                            KeyCode::Tab => self.input_mode = InputMode::Normal,
+                            KeyCode::Enter => {
+                                self.message_holder.submit();
+                                if self.message_holder.file_opened.is_some() {
+                                    self.input_mode = InputMode::FileView;
+                                }
+                                self.input.reset();
+                            }
+                            _ => {
+                                self.input.handle_event(&event);
+                                self.message_holder.update(self.input.value());
+                            }
+                        },
+                    }
                 }
+            }
+            if last_tick.elapsed() >= tick_rate {
+                last_tick = Instant::now();
             }
         }
     }
 
-    fn draw(&self, frame: &mut Frame) {
+    fn draw(&mut self, frame: &mut Frame) {
         let vertical = Layout::vertical([
             Constraint::Min(1),
             Constraint::Length(3),
@@ -132,6 +177,7 @@ impl App {
             InputMode::FileView => {
                 instructions = Text::from(Line::from(vec![
                     " FileView".bold(),
+                    "Use h j k l or ◄ ▲ ▼ ► to scroll ".bold(),
                     " Quit ".into(),
                     "<Q>".blue().bold(),
                 ]));
@@ -244,16 +290,16 @@ impl MessageHolder {
         entries
     }
 
-    fn draw(&self, area: Rect, frame: &mut Frame) {
-        match &self.file_opened {
+    fn draw(&mut self, area: Rect, frame: &mut Frame) {
+        match self.file_opened.clone() {
             None => self.draw_file_view_search(area, frame),
             Some(file_path) => {
-                self.draw_file_view(area, frame, file_path);
+                self.draw_file_view(area, frame, &file_path);
             }
         }
     }
 
-    fn draw_file_view_search(&self, area: Rect, frame: &mut Frame) {
+    fn draw_file_view_search(&mut self, area: Rect, frame: &mut Frame) {
         let path_holder: Vec<ListItem> = self
             .messages
             .iter()
@@ -271,17 +317,39 @@ impl MessageHolder {
         frame.render_widget(messages, area);
     }
 
-    fn draw_file_view(&self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
-        let horizontal = Layout::horizontal([Constraint::Ratio(1, 2); 2]);
-        let [left, right] = horizontal.areas(area);
+    fn get_string_dimensions(&self, text: &str) -> (usize, usize) {
+        let lines: Vec<&str> = text.split('\n').collect();
+        let num_rows = lines.len();
+        let max_line_length = lines.iter().map(|line| line.len()).max().unwrap_or(0);
+        (num_rows, max_line_length)
+    }
 
-        let messages = Paragraph::new(file_path.to_string_lossy().into_owned())
-            .block(Block::bordered().title(self.current_directory.clone()));
+    fn draw_file_view(&mut self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
+        let file_preview = Paragraph::new(self.file_text.clone())
+            .block(Block::bordered().title(file_path.to_string_lossy().into_owned()))
+            .scroll((self.vertical_scroll as u16, self.horizontal_scroll as u16));
 
-        let file_preview = Paragraph::new(self.file_text.clone()).block(Block::bordered());
+        let (n_rows, max_line_length) = self.get_string_dimensions(&self.file_text);
+        self.vertical_scroll_state = self.vertical_scroll_state.content_length(n_rows);
+        self.horizontal_scroll_state = self.horizontal_scroll_state.content_length(max_line_length);
 
-        frame.render_widget(messages, left);
-        frame.render_widget(file_preview, right);
+        frame.render_widget(file_preview, area);
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight).symbols(scrollbar::VERTICAL),
+            area.inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut self.vertical_scroll_state,
+        );
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::HorizontalBottom).symbols(scrollbar::HORIZONTAL),
+            area.inner(Margin {
+                vertical: 0,
+                horizontal: 1,
+            }),
+            &mut self.horizontal_scroll_state,
+        );
     }
 
     fn should_select(&self, name: &str) -> bool {
