@@ -1,48 +1,24 @@
+use std::io::{self};
 use std::time::{Duration, Instant};
-use std::{
-    env,
-    fs::{self},
-    io::{self},
-};
 
-use ratatui::symbols::scrollbar;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
-    layout::{Constraint, Layout, Margin, Rect},
+    layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Text},
-    widgets::{Block, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{Block, Paragraph},
     DefaultTerminal, Frame,
 };
-use std::path::PathBuf;
 use tui_input::backend::crossterm::EventHandler;
 use tui_input::Input;
+
+mod message_holder;
 
 #[derive(Debug, Default)]
 struct App {
     input_mode: InputMode,
     input: Input,
-    message_holder: MessageHolder,
-}
-
-#[derive(Debug, Default)]
-struct MessageHolder {
-    messages: Vec<FileHolder>,
-    current_directory: String,
-    input: String,
-    file_opened: Option<PathBuf>,
-    file_text: String,
-    vertical_scroll_state: ScrollbarState,
-    horizontal_scroll_state: ScrollbarState,
-    vertical_scroll: usize,
-    horizontal_scroll: usize,
-}
-
-#[derive(Debug)]
-struct FileHolder {
-    file_name: String,
-    is_file: bool,
-    parent_folder: PathBuf,
+    message_holder: message_holder::message_holder::MessageHolder,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -52,6 +28,7 @@ enum InputMode {
     FileSearch,
     FileView,
 }
+
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
     let app_result = App::default().run(&mut terminal);
@@ -79,7 +56,9 @@ impl App {
                             }
                             KeyCode::Char('j') | KeyCode::Down => {
                                 self.message_holder.vertical_scroll =
-                                    self.message_holder.vertical_scroll.saturating_add(1);
+                                    self.message_holder.vertical_scroll.saturating_add(1).min(
+                                        self.message_holder.file_text_info.as_ref().unwrap().n_rows,
+                                    );
                                 self.message_holder.vertical_scroll_state = self
                                     .message_holder
                                     .vertical_scroll_state
@@ -103,11 +82,60 @@ impl App {
                             }
                             KeyCode::Char('l') | KeyCode::Right => {
                                 self.message_holder.horizontal_scroll =
-                                    self.message_holder.horizontal_scroll.saturating_add(1);
+                                    self.message_holder.horizontal_scroll.saturating_add(1).min(
+                                        self.message_holder
+                                            .file_text_info
+                                            .as_ref()
+                                            .unwrap()
+                                            .max_line_length,
+                                    );
                                 self.message_holder.horizontal_scroll_state = self
                                     .message_holder
                                     .horizontal_scroll_state
                                     .position(self.message_holder.horizontal_scroll);
+                            }
+                            KeyCode::Home => {
+                                self.message_holder.horizontal_scroll = 0;
+                                self.message_holder.horizontal_scroll_state = self
+                                    .message_holder
+                                    .horizontal_scroll_state
+                                    .position(self.message_holder.horizontal_scroll);
+                                self.message_holder.vertical_scroll = 0;
+                                self.message_holder.vertical_scroll_state = self
+                                    .message_holder
+                                    .vertical_scroll_state
+                                    .position(self.message_holder.vertical_scroll);
+                            }
+                            KeyCode::End => {
+                                self.message_holder.vertical_scroll = self
+                                    .message_holder
+                                    .file_text_info
+                                    .as_ref()
+                                    .unwrap()
+                                    .n_rows
+                                    .saturating_sub(30);
+                                self.message_holder.vertical_scroll_state = self
+                                    .message_holder
+                                    .vertical_scroll_state
+                                    .position(self.message_holder.vertical_scroll);
+                            }
+                            KeyCode::PageDown => {
+                                self.message_holder.vertical_scroll =
+                                    self.message_holder.vertical_scroll.saturating_add(30).min(
+                                        self.message_holder.file_text_info.as_ref().unwrap().n_rows,
+                                    );
+                                self.message_holder.vertical_scroll_state = self
+                                    .message_holder
+                                    .vertical_scroll_state
+                                    .position(self.message_holder.vertical_scroll);
+                            }
+                            KeyCode::PageUp => {
+                                self.message_holder.vertical_scroll =
+                                    self.message_holder.vertical_scroll.saturating_sub(30);
+                                self.message_holder.vertical_scroll_state = self
+                                    .message_holder
+                                    .vertical_scroll_state
+                                    .position(self.message_holder.vertical_scroll);
                             }
                             _ => (),
                         },
@@ -207,172 +235,5 @@ impl App {
             let x = self.input.visual_cursor().max(scroll) - scroll + 1;
             frame.set_cursor_position((area.x + x as u16, area.y + 1));
         }
-    }
-}
-
-impl From<PathBuf> for FileHolder {
-    fn from(path: PathBuf) -> Self {
-        let file_name = path
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap();
-
-        FileHolder {
-            file_name: file_name,
-            is_file: path.is_file(),
-            parent_folder: path.parent().unwrap().to_path_buf(),
-        }
-    }
-}
-
-impl MessageHolder {
-    fn update(&mut self, input: &str) {
-        self.input = input.to_string();
-    }
-
-    fn reset(&mut self) {
-        self.input.clear();
-        self.file_opened = None;
-        self.file_text.clear();
-        self.setup();
-    }
-
-    fn setup(&mut self) {
-        if self.current_directory.is_empty() {
-            self.current_directory = env::current_dir().unwrap().to_string_lossy().into_owned();
-        }
-        // let current_directory = String::from("/");
-        self.messages = self.get_directory_files(&self.current_directory);
-    }
-
-    fn submit(&mut self) {
-        let path_holder: Vec<FileHolder> = std::mem::take(&mut self.messages)
-            .into_iter()
-            .filter(|entry| self.should_select(&entry.file_name))
-            .collect();
-        assert!(!path_holder.is_empty());
-
-        let filename = &path_holder[0].file_name;
-        let new_entrypoint = format!("{}/{}", self.current_directory, filename);
-        let new_entrypoint_path = PathBuf::from(new_entrypoint.clone());
-        if new_entrypoint_path.is_dir() {
-            self.messages = self.get_directory_files(&new_entrypoint);
-            self.current_directory = new_entrypoint;
-            self.input = String::new();
-        } else {
-            match fs::read_to_string(&new_entrypoint_path) {
-                Ok(text) => self.file_text = text,
-                Err(_) => self.file_text = "Unable to read...".to_string(),
-            }
-            self.file_opened = Some(new_entrypoint_path);
-        }
-    }
-
-    fn get_directory_files(&self, path: &str) -> Vec<FileHolder> {
-        let path_buf = PathBuf::from(path);
-        let mut entries = Vec::new();
-
-        // add if not at root
-        if let Some(parent) = path_buf.parent() {
-            entries.push(FileHolder {
-                file_name: "..".to_string(),
-                is_file: false,
-                parent_folder: parent.to_path_buf(), // BUG: incorrect parent of parent
-            })
-        }
-
-        entries.extend(
-            fs::read_dir(&path_buf)
-                .unwrap()
-                .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path()))),
-        );
-
-        entries
-    }
-
-    fn draw(&mut self, area: Rect, frame: &mut Frame) {
-        match self.file_opened.clone() {
-            None => self.draw_file_view_search(area, frame),
-            Some(file_path) => {
-                self.draw_file_view(area, frame, &file_path);
-            }
-        }
-    }
-
-    fn draw_file_view_search(&mut self, area: Rect, frame: &mut Frame) {
-        let path_holder: Vec<ListItem> = self
-            .messages
-            .iter()
-            .filter(|entry| self.should_select(&entry.file_name))
-            .map(|entry| {
-                ListItem::new(Line::from(entry.file_name.clone()).style(if entry.is_file {
-                    Style::default()
-                } else {
-                    Color::LightCyan.into()
-                }))
-            })
-            .collect();
-        let messages =
-            List::new(path_holder).block(Block::bordered().title(self.current_directory.clone()));
-        frame.render_widget(messages, area);
-    }
-
-    fn get_string_dimensions(&self, text: &str) -> (usize, usize) {
-        let lines: Vec<&str> = text.split('\n').collect();
-        let num_rows = lines.len();
-        let max_line_length = lines.iter().map(|line| line.len()).max().unwrap_or(0);
-        (num_rows, max_line_length)
-    }
-
-    fn draw_file_view(&mut self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
-        let file_preview = Paragraph::new(self.file_text.clone())
-            .block(Block::bordered().title(file_path.to_string_lossy().into_owned()))
-            .scroll((self.vertical_scroll as u16, self.horizontal_scroll as u16));
-
-        let (n_rows, max_line_length) = self.get_string_dimensions(&self.file_text);
-        self.vertical_scroll_state = self.vertical_scroll_state.content_length(n_rows);
-        self.horizontal_scroll_state = self.horizontal_scroll_state.content_length(max_line_length);
-
-        frame.render_widget(file_preview, area);
-        frame.render_stateful_widget(
-            Scrollbar::new(ScrollbarOrientation::VerticalRight).symbols(scrollbar::VERTICAL),
-            area.inner(Margin {
-                vertical: 1,
-                horizontal: 0,
-            }),
-            &mut self.vertical_scroll_state,
-        );
-        frame.render_stateful_widget(
-            Scrollbar::new(ScrollbarOrientation::HorizontalBottom).symbols(scrollbar::HORIZONTAL),
-            area.inner(Margin {
-                vertical: 0,
-                horizontal: 1,
-            }),
-            &mut self.horizontal_scroll_state,
-        );
-    }
-
-    fn should_select(&self, name: &str) -> bool {
-        if self.input.is_empty() {
-            return true;
-        }
-
-        let mut counter = 0;
-        for char in name.chars() {
-            if char.eq_ignore_ascii_case(
-                &self
-                    .input
-                    .chars()
-                    .nth(counter)
-                    .expect("Should not reach out of bounds"),
-            ) {
-                counter += 1;
-            }
-            if counter == self.input.len() {
-                return true;
-            }
-        }
-
-        false
     }
 }
