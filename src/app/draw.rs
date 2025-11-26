@@ -45,7 +45,6 @@ impl App {
             InputMode::FileView => {
                 instructions = Text::from(Line::from(vec![
                     " FileView".bold(),
-                    "Use h j k l or ◄ ▲ ▼ ► to scroll ".bold(),
                     " Quit ".into(),
                     "<Q>".blue().bold(),
                 ]));

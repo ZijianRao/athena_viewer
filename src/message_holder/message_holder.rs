@@ -3,6 +3,7 @@ use std::{
     fs::{self},
 };
 
+use chrono::{DateTime, Local};
 use ratatui::symbols::scrollbar;
 use ratatui::{
     layout::{Margin, Rect},
@@ -11,6 +12,7 @@ use ratatui::{
     widgets::{Block, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame,
 };
+
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -25,6 +27,7 @@ pub struct MessageHolder {
     messages: Vec<FileHolder>,
     current_directory: String,
     input: String,
+    last_refresh_time: DateTime<Local>,
     pub file_opened: Option<PathBuf>,
     pub file_text_info: Option<FileTextInfo>,
     pub vertical_scroll_state: ScrollbarState,
@@ -97,6 +100,7 @@ impl MessageHolder {
         }
         // let current_directory = String::from("/");
         self.messages = self.get_directory_files(&self.current_directory);
+        self.last_refresh_time = Local::now();
     }
 
     pub fn submit(&mut self) {
@@ -107,12 +111,14 @@ impl MessageHolder {
         assert!(!path_holder.is_empty());
 
         let filename = &path_holder[0].file_name;
-        let new_entrypoint = format!("{}/{}", self.current_directory, filename);
-        let new_entrypoint_path = PathBuf::from(new_entrypoint.clone());
+        let new_entrypoint_raw = format!("{}/{}", self.current_directory, filename);
+        let new_entrypoint_path = PathBuf::from(new_entrypoint_raw).canonicalize().unwrap();
         if new_entrypoint_path.is_dir() {
+            let new_entrypoint = new_entrypoint_path.to_string_lossy().into_owned();
             self.messages = self.get_directory_files(&new_entrypoint);
             self.current_directory = new_entrypoint;
             self.input = String::new();
+            self.last_refresh_time = Local::now();
         } else {
             self.file_text_info = Some(FileTextInfo::new(&new_entrypoint_path));
             self.file_opened = Some(new_entrypoint_path);
@@ -163,8 +169,13 @@ impl MessageHolder {
                 }))
             })
             .collect();
-        let messages =
-            List::new(path_holder).block(Block::bordered().title(self.current_directory.clone()));
+
+        let title = format!(
+            "{} {}",
+            self.current_directory,
+            self.last_refresh_time.format("%Y-%m-%d %H:%M")
+        );
+        let messages = List::new(path_holder).block(Block::bordered().title(title));
         frame.render_widget(messages, area);
     }
 
