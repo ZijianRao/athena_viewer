@@ -4,6 +4,7 @@ use std::{
 };
 
 use chrono::{DateTime, Local};
+use lru::LruCache;
 use ratatui::symbols::scrollbar;
 use ratatui::{
     layout::{Margin, Rect},
@@ -12,7 +13,7 @@ use ratatui::{
     widgets::{Block, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame,
 };
-
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -22,12 +23,11 @@ pub struct FileTextInfo {
     pub max_line_length: usize,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct MessageHolder {
-    messages: Vec<FileHolder>,
-    current_directory: String,
+    cache_holder: LruCache<PathBuf, FileGroupHolder>,
+    current_directory: PathBuf,
     input: String,
-    last_refresh_time: DateTime<Local>,
     pub file_opened: Option<PathBuf>,
     pub file_text_info: Option<FileTextInfo>,
     pub vertical_scroll_state: ScrollbarState,
@@ -36,11 +36,17 @@ pub struct MessageHolder {
     pub horizontal_scroll: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FileHolder {
     file_name: String,
     is_file: bool,
-    parent_folder: PathBuf,
+}
+
+#[derive(Debug)]
+struct FileGroupHolder {
+    parent: PathBuf,
+    child: Vec<FileHolder>,
+    update_time: DateTime<Local>,
 }
 
 impl FileTextInfo {
@@ -77,11 +83,50 @@ impl From<PathBuf> for FileHolder {
         FileHolder {
             file_name: file_name,
             is_file: path.is_file(),
-            parent_folder: path.parent().unwrap().to_path_buf(),
         }
     }
 }
 
+impl From<PathBuf> for FileGroupHolder {
+    fn from(path: PathBuf) -> Self {
+        let mut entries = Vec::new();
+
+        // add if not at root
+        if let Some(_parent) = path.parent() {
+            entries.push(FileHolder {
+                file_name: "..".to_string(),
+                is_file: false,
+            })
+        }
+
+        entries.extend(
+            fs::read_dir(&path)
+                .unwrap()
+                .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path()))),
+        );
+        Self {
+            child: entries,
+            parent: path,
+            update_time: Local::now(),
+        }
+    }
+}
+
+impl Default for MessageHolder {
+    fn default() -> Self {
+        Self {
+            cache_holder: LruCache::new(NonZeroUsize::new(100).unwrap()),
+            current_directory: Default::default(),
+            input: Default::default(),
+            file_opened: Default::default(),
+            file_text_info: Default::default(),
+            vertical_scroll_state: Default::default(),
+            horizontal_scroll_state: Default::default(),
+            vertical_scroll: Default::default(),
+            horizontal_scroll: Default::default(),
+        }
+    }
+}
 impl MessageHolder {
     pub fn update(&mut self, input: &str) {
         self.input = input.to_string();
@@ -95,61 +140,56 @@ impl MessageHolder {
     }
 
     pub fn setup(&mut self) {
-        if self.current_directory.is_empty() {
-            self.current_directory = env::current_dir().unwrap().to_string_lossy().into_owned();
+        if self.current_directory.as_os_str().is_empty() {
+            self.current_directory = env::current_dir().unwrap();
         }
         // let current_directory = String::from("/");
-        self.messages = self.get_directory_files(&self.current_directory);
-        self.last_refresh_time = Local::now();
+
+        let holder = FileGroupHolder::from(self.current_directory.clone());
+        self.cache_holder
+            .put(self.current_directory.clone(), holder);
     }
 
     pub fn submit(&mut self) {
-        let path_holder: Vec<FileHolder> = std::mem::take(&mut self.messages)
+        let mut messages = self
+            .cache_holder
+            .get(&self.current_directory)
+            .unwrap()
+            .child
+            .clone();
+        let path_holder: Vec<FileHolder> = std::mem::take(&mut messages)
             .into_iter()
             .filter(|entry| self.should_select(&entry.file_name))
             .collect();
         assert!(!path_holder.is_empty());
 
         let filename = &path_holder[0].file_name;
-        let new_entrypoint_raw = format!("{}/{}", self.current_directory, filename);
-        let new_entrypoint_path = PathBuf::from(new_entrypoint_raw).canonicalize().unwrap();
-        if new_entrypoint_path.is_dir() {
-            let new_entrypoint = new_entrypoint_path.to_string_lossy().into_owned();
-            self.messages = self.get_directory_files(&new_entrypoint);
+        let new_entrypoint = self
+            .current_directory
+            .join(filename)
+            .canonicalize()
+            .unwrap();
+        if new_entrypoint.is_dir() {
             self.current_directory = new_entrypoint;
+            if self.cache_holder.get(&self.current_directory).is_none() {
+                let holder = FileGroupHolder::from(self.current_directory.clone());
+                self.cache_holder
+                    .put(self.current_directory.clone(), holder);
+            }
             self.input = String::new();
-            self.last_refresh_time = Local::now();
         } else {
-            self.file_text_info = Some(FileTextInfo::new(&new_entrypoint_path));
-            self.file_opened = Some(new_entrypoint_path);
+            self.file_text_info = Some(FileTextInfo::new(&new_entrypoint));
+            self.file_opened = Some(new_entrypoint);
         }
-    }
-
-    fn get_directory_files(&self, path: &str) -> Vec<FileHolder> {
-        let path_buf = PathBuf::from(path);
-        let mut entries = Vec::new();
-
-        // add if not at root
-        if let Some(parent) = path_buf.parent() {
-            entries.push(FileHolder {
-                file_name: "..".to_string(),
-                is_file: false,
-                parent_folder: parent.to_path_buf(), // BUG: incorrect parent of parent
-            })
-        }
-
-        entries.extend(
-            fs::read_dir(&path_buf)
-                .unwrap()
-                .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path()))),
-        );
-
-        entries
     }
 
     pub fn draw(&mut self, area: Rect, frame: &mut Frame) {
         match self.file_opened.clone() {
-            None => self.draw_file_view_search(area, frame),
+            None => {
+                if !self.current_directory.as_os_str().is_empty() {
+                    self.draw_file_view_search(area, frame);
+                }
+            }
             Some(file_path) => {
                 self.draw_file_view(area, frame, &file_path);
             }
@@ -157,8 +197,10 @@ impl MessageHolder {
     }
 
     fn draw_file_view_search(&mut self, area: Rect, frame: &mut Frame) {
-        let path_holder: Vec<ListItem> = self
-            .messages
+        let current_file_holder = self.cache_holder.peek(&self.current_directory).unwrap();
+
+        let path_holder: Vec<ListItem> = current_file_holder
+            .child
             .iter()
             .filter(|entry| self.should_select(&entry.file_name))
             .map(|entry| {
@@ -172,8 +214,8 @@ impl MessageHolder {
 
         let title = format!(
             "{} {}",
-            self.current_directory,
-            self.last_refresh_time.format("%Y-%m-%d %H:%M")
+            self.current_directory.display(),
+            current_file_holder.update_time.format("%Y-%m-%d %H:%M:%S")
         );
         let messages = List::new(path_holder).block(Block::bordered().title(title));
         frame.render_widget(messages, area);
