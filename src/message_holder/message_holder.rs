@@ -1,5 +1,6 @@
 use std::env;
 
+use crate::message_holder::code_highlighter::CodeHighlighter;
 use crate::message_holder::file_helper::{FileGroupHolder, FileHolder, FileTextInfo};
 use lru::LruCache;
 use ratatui::symbols::scrollbar;
@@ -18,6 +19,7 @@ pub struct MessageHolder {
     cache_holder: LruCache<PathBuf, FileGroupHolder>,
     current_directory: PathBuf,
     input: String,
+    code_highlighter: CodeHighlighter,
     pub file_opened: Option<PathBuf>,
     pub file_text_info: Option<FileTextInfo>,
     pub vertical_scroll_state: ScrollbarState,
@@ -38,6 +40,7 @@ impl Default for MessageHolder {
             horizontal_scroll_state: Default::default(),
             vertical_scroll: Default::default(),
             horizontal_scroll: Default::default(),
+            code_highlighter: CodeHighlighter::new(),
         }
     }
 }
@@ -137,9 +140,12 @@ impl MessageHolder {
 
     fn draw_file_view(&mut self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
         let file_text_info = self.file_text_info.as_ref().unwrap();
-        let file_preview = Paragraph::new(file_text_info.text.clone())
-            .block(Block::bordered().title(file_path.to_string_lossy().into_owned()))
-            .scroll((self.vertical_scroll as u16, self.horizontal_scroll as u16));
+        let file_preview = Paragraph::new(
+            self.code_highlighter
+                .highlight(&file_text_info.text, file_path),
+        )
+        .block(Block::bordered().title(file_path.to_string_lossy().into_owned()))
+        .scroll((self.vertical_scroll as u16, self.horizontal_scroll as u16));
 
         self.vertical_scroll_state = self
             .vertical_scroll_state
