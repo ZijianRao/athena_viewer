@@ -1,8 +1,5 @@
-use ratatui::{
-    prelude::*,
-    widgets::{Block, Borders, Paragraph},
-};
-use std::path::{Path, PathBuf};
+use ratatui::prelude::*;
+use std::path::PathBuf;
 use syntect::{
     easy::HighlightLines,
     highlighting::{Theme, ThemeSet},
@@ -26,12 +23,10 @@ impl CodeHighlighter {
     }
 
     pub fn highlight<'a>(&self, code: &'a str, file_path: &PathBuf) -> Vec<Line<'a>> {
-        let syntax = self.syntax_set.find_syntax_by_extension("rs").unwrap();
-
-        // let syntax = self
-        //     .syntax_set
-        //     .find_syntax_by_path(file_path.to_str().unwrap())
-        //     .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+        let syntax = self
+            .syntax_set
+            .find_syntax_by_extension(file_path.extension().unwrap().to_str().unwrap())
+            .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
 
         let mut highlighter = HighlightLines::new(syntax, &self.theme);
         let mut lines = Vec::new();
@@ -47,11 +42,7 @@ impl CodeHighlighter {
                             style.foreground.r,
                             style.foreground.g,
                             style.foreground.b,
-                        )), // .bg(Color::Rgb(
-                            //     style.background.r,
-                            //     style.background.g,
-                            //     style.background.b,
-                            // )),
+                        )),
                     )
                 })
                 .collect::<Vec<_>>();
