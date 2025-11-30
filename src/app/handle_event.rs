@@ -130,6 +130,14 @@ impl App {
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Tab => self.input_mode = InputMode::Normal,
+                KeyCode::Up => {
+                    self.message_holder.highlight_index =
+                        self.message_holder.highlight_index.saturating_sub(1);
+                }
+                KeyCode::Down => {
+                    self.message_holder.highlight_index =
+                        self.message_holder.highlight_index.saturating_add(1);
+                }
                 KeyCode::Enter => {
                     self.message_holder.submit();
                     if self.message_holder.file_opened.is_some() {
@@ -139,6 +147,7 @@ impl App {
                 }
                 _ => {
                     self.input.handle_event(&event);
+                    self.message_holder.highlight_index = 0;
                     self.message_holder.update(self.input.value());
                 }
             }

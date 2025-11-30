@@ -3,10 +3,11 @@ use std::env;
 use crate::message_holder::code_highlighter::CodeHighlighter;
 use crate::message_holder::file_helper::{FileGroupHolder, FileHolder, FileTextInfo};
 use lru::LruCache;
+use ratatui::style::Stylize;
 use ratatui::symbols::scrollbar;
 use ratatui::{
     layout::{Margin, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::Line,
     widgets::{Block, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame,
@@ -20,6 +21,7 @@ pub struct MessageHolder {
     current_directory: PathBuf,
     input: String,
     code_highlighter: CodeHighlighter,
+    pub highlight_index: usize,
     pub file_opened: Option<PathBuf>,
     pub file_text_info: Option<FileTextInfo>,
     pub vertical_scroll_state: ScrollbarState,
@@ -34,13 +36,14 @@ impl Default for MessageHolder {
             cache_holder: LruCache::new(NonZeroUsize::new(100).unwrap()),
             current_directory: Default::default(),
             input: Default::default(),
+            code_highlighter: CodeHighlighter::new(),
+            highlight_index: Default::default(),
             file_opened: Default::default(),
             file_text_info: Default::default(),
             vertical_scroll_state: Default::default(),
             horizontal_scroll_state: Default::default(),
             vertical_scroll: Default::default(),
             horizontal_scroll: Default::default(),
-            code_highlighter: CodeHighlighter::new(),
         }
     }
 }
@@ -80,7 +83,7 @@ impl MessageHolder {
             .collect();
         assert!(!path_holder.is_empty());
 
-        let filename = &path_holder[0].file_name;
+        let filename = &path_holder[self.highlight_index].file_name;
         let new_entrypoint = self
             .current_directory
             .join(filename)
@@ -116,7 +119,7 @@ impl MessageHolder {
     fn draw_file_view_search(&mut self, area: Rect, frame: &mut Frame) {
         let current_file_holder = self.cache_holder.peek(&self.current_directory).unwrap();
 
-        let path_holder: Vec<ListItem> = current_file_holder
+        let mut path_holder: Vec<ListItem> = current_file_holder
             .child
             .iter()
             .filter(|entry| self.should_select(&entry.file_name))
@@ -128,6 +131,15 @@ impl MessageHolder {
                 }))
             })
             .collect();
+
+        if !path_holder.is_empty() {
+            if path_holder.len() <= self.highlight_index {
+                self.highlight_index = path_holder.len() - 1;
+            }
+        }
+        if let Some(path) = path_holder.get_mut(self.highlight_index) {
+            *path = path.clone().add_modifier(Modifier::REVERSED);
+        };
 
         let title = format!(
             "{} {}",
