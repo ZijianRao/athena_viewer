@@ -116,6 +116,7 @@ impl App {
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Char('q') => self.exit = true,
+                KeyCode::Char('u') => self.message_holder.refresh_current_folder_cache(),
                 KeyCode::Tab => {
                     self.input_mode = InputMode::FileSearch;
                     self.message_holder.setup();

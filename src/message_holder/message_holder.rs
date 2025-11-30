@@ -52,6 +52,12 @@ impl MessageHolder {
         self.input = input.to_string();
     }
 
+    pub fn refresh_current_folder_cache(&mut self) {
+        let holder = FileGroupHolder::from(self.current_directory.clone());
+        self.cache_holder
+            .put(self.current_directory.clone(), holder);
+    }
+
     pub fn reset(&mut self) {
         self.input.clear();
         self.file_opened = None;
@@ -63,7 +69,6 @@ impl MessageHolder {
         if self.current_directory.as_os_str().is_empty() {
             self.current_directory = env::current_dir().unwrap();
         }
-        // let current_directory = String::from("/");
 
         let holder = FileGroupHolder::from(self.current_directory.clone());
         self.cache_holder
@@ -84,6 +89,7 @@ impl MessageHolder {
         assert!(!path_holder.is_empty());
 
         let filename = &path_holder[self.highlight_index].file_name;
+        // BUG: try to access removed files as they are still in the cached result
         let new_entrypoint = self
             .current_directory
             .join(filename)

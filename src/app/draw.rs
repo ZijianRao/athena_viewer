@@ -33,6 +33,8 @@ impl App {
                     "<Tab>".blue().bold(),
                     " Quit ".into(),
                     "<Q>".blue().bold(),
+                    " Update ".into(),
+                    "<U>".blue().bold(),
                 ]));
             }
             InputMode::FileSearch => {
