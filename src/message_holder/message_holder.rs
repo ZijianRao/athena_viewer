@@ -89,23 +89,26 @@ impl MessageHolder {
         assert!(!path_holder.is_empty());
 
         let filename = &path_holder[self.highlight_index].file_name;
-        // BUG: try to access removed files as they are still in the cached result
-        let new_entrypoint = self
-            .current_directory
-            .join(filename)
-            .canonicalize()
-            .unwrap();
-        if new_entrypoint.is_dir() {
-            self.current_directory = new_entrypoint;
-            if self.cache_holder.get(&self.current_directory).is_none() {
-                let holder = FileGroupHolder::from(self.current_directory.clone());
-                self.cache_holder
-                    .put(self.current_directory.clone(), holder);
+        let new_entrypoint_canonicalized_result =
+            self.current_directory.join(filename).canonicalize();
+        match new_entrypoint_canonicalized_result {
+            Ok(new_entrypoint) => {
+                if new_entrypoint.is_dir() {
+                    self.current_directory = new_entrypoint;
+                    if self.cache_holder.get(&self.current_directory).is_none() {
+                        let holder = FileGroupHolder::from(self.current_directory.clone());
+                        self.cache_holder
+                            .put(self.current_directory.clone(), holder);
+                    }
+                    self.input = String::new();
+                } else {
+                    self.file_text_info = Some(FileTextInfo::new(&new_entrypoint));
+                    self.file_opened = Some(new_entrypoint);
+                }
             }
-            self.input = String::new();
-        } else {
-            self.file_text_info = Some(FileTextInfo::new(&new_entrypoint));
-            self.file_opened = Some(new_entrypoint);
+            Err(_) => {
+                self.setup();
+            }
         }
     }
 
