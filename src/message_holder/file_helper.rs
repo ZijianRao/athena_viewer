@@ -1,13 +1,16 @@
 use std::fs::{self};
 
 use chrono::{DateTime, Local};
+use ratatui::text::Line;
 use std::path::PathBuf;
+
+use crate::message_holder::code_highlighter::CodeHighlighter;
 
 #[derive(Debug)]
 pub struct FileTextInfo {
-    pub text: String,
     pub n_rows: usize,
     pub max_line_length: usize,
+    pub formatted_text: Vec<Line<'static>>,
 }
 
 #[derive(Debug, Clone)]
@@ -24,7 +27,7 @@ pub struct FileGroupHolder {
 }
 
 impl FileTextInfo {
-    pub fn new(value: &PathBuf) -> Self {
+    pub fn new(value: &PathBuf, code_highlighter: &CodeHighlighter) -> Self {
         let content = match fs::read_to_string(value) {
             Ok(text) => text,
             Err(_) => "Unable to read...".to_string(),
@@ -33,9 +36,9 @@ impl FileTextInfo {
         let (num_rows, max_line_length) = Self::get_string_dimensions(&content);
 
         Self {
-            text: content,
             n_rows: num_rows,
             max_line_length: max_line_length,
+            formatted_text: code_highlighter.highlight(&content, value),
         }
     }
 

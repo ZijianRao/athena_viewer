@@ -102,7 +102,8 @@ impl MessageHolder {
                     }
                     self.input = String::new();
                 } else {
-                    self.file_text_info = Some(FileTextInfo::new(&new_entrypoint));
+                    self.file_text_info =
+                        Some(FileTextInfo::new(&new_entrypoint, &self.code_highlighter));
                     self.file_opened = Some(new_entrypoint);
                 }
             }
@@ -161,12 +162,9 @@ impl MessageHolder {
 
     fn draw_file_view(&mut self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
         let file_text_info = self.file_text_info.as_ref().unwrap();
-        let file_preview = Paragraph::new(
-            self.code_highlighter
-                .highlight(&file_text_info.text, file_path),
-        )
-        .block(Block::bordered().title(file_path.to_string_lossy().into_owned()))
-        .scroll((self.vertical_scroll as u16, self.horizontal_scroll as u16));
+        let file_preview = Paragraph::new(file_text_info.formatted_text.clone())
+            .block(Block::bordered().title(file_path.to_string_lossy().into_owned()))
+            .scroll((self.vertical_scroll as u16, self.horizontal_scroll as u16));
 
         self.vertical_scroll_state = self
             .vertical_scroll_state

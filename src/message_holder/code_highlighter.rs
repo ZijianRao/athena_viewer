@@ -22,7 +22,7 @@ impl CodeHighlighter {
         Self { syntax_set, theme }
     }
 
-    pub fn highlight<'a>(&self, code: &'a str, file_path: &PathBuf) -> Vec<Line<'a>> {
+    pub fn highlight(&self, code: &str, file_path: &PathBuf) -> Vec<Line<'static>> {
         let syntax = file_path
             .extension()
             .and_then(|ext| ext.to_str())
@@ -32,13 +32,13 @@ impl CodeHighlighter {
         let mut highlighter = HighlightLines::new(syntax, &self.theme);
         let mut lines = Vec::new();
 
-        for line in LinesWithEndings::from(code) {
+        for line in LinesWithEndings::from(&code) {
             let ranges = highlighter.highlight_line(line, &self.syntax_set).unwrap();
             let spans = ranges
                 .into_iter()
                 .map(|(style, text)| {
                     Span::styled(
-                        text,
+                        text.to_string(),
                         Style::default().fg(Color::Rgb(
                             style.foreground.r,
                             style.foreground.g,
