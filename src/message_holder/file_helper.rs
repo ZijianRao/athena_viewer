@@ -21,7 +21,6 @@ pub struct FileHolder {
 
 #[derive(Debug)]
 pub struct FileGroupHolder {
-    pub parent: PathBuf,
     pub child: Vec<FileHolder>,
     pub update_time: DateTime<Local>,
 }
@@ -83,7 +82,6 @@ impl From<PathBuf> for FileGroupHolder {
         );
         Self {
             child: entries,
-            parent: path,
             update_time: Local::now(),
         }
     }

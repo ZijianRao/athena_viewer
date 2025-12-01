@@ -156,14 +156,14 @@ impl MessageHolder {
             self.current_directory.display(),
             current_file_holder.update_time.format("%Y-%m-%d %H:%M:%S")
         );
-        let messages = List::new(path_holder).block(Block::bordered().title(title));
+        let messages = List::new(path_holder).block(Block::default().title(title));
         frame.render_widget(messages, area);
     }
 
     fn draw_file_view(&mut self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
         let file_text_info = self.file_text_info.as_ref().unwrap();
         let file_preview = Paragraph::new(file_text_info.formatted_text.clone())
-            .block(Block::bordered().title(file_path.to_string_lossy().into_owned()))
+            .block(Block::default().title(file_path.to_string_lossy().into_owned()))
             .scroll((self.vertical_scroll as u16, self.horizontal_scroll as u16));
 
         self.vertical_scroll_state = self
@@ -174,14 +174,14 @@ impl MessageHolder {
             .content_length(file_text_info.max_line_length);
 
         frame.render_widget(file_preview, area);
-        frame.render_stateful_widget(
-            Scrollbar::new(ScrollbarOrientation::VerticalRight).symbols(scrollbar::VERTICAL),
-            area.inner(Margin {
-                vertical: 1,
-                horizontal: 0,
-            }),
-            &mut self.vertical_scroll_state,
-        );
+        // frame.render_stateful_widget(
+        //     Scrollbar::new(ScrollbarOrientation::VerticalRight).symbols(scrollbar::VERTICAL),
+        //     area.inner(Margin {
+        //         vertical: 1,
+        //         horizontal: 0,
+        //     }),
+        //     &mut self.vertical_scroll_state,
+        // );
         frame.render_stateful_widget(
             Scrollbar::new(ScrollbarOrientation::HorizontalBottom).symbols(scrollbar::HORIZONTAL),
             area.inner(Margin {
