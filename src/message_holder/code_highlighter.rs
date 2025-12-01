@@ -23,9 +23,10 @@ impl CodeHighlighter {
     }
 
     pub fn highlight<'a>(&self, code: &'a str, file_path: &PathBuf) -> Vec<Line<'a>> {
-        let syntax = self
-            .syntax_set
-            .find_syntax_by_extension(file_path.extension().unwrap().to_str().unwrap())
+        let syntax = file_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .and_then(|ext_str| self.syntax_set.find_syntax_by_extension(ext_str))
             .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
 
         let mut highlighter = HighlightLines::new(syntax, &self.theme);
