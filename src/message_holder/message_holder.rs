@@ -21,6 +21,7 @@ pub struct MessageHolder {
     current_directory: PathBuf,
     input: String,
     code_highlighter: CodeHighlighter,
+    pub view_history: bool,
     pub highlight_index: usize,
     pub file_opened: Option<PathBuf>,
     pub file_text_info: Option<FileTextInfo>,
@@ -36,6 +37,7 @@ impl Default for MessageHolder {
             cache_holder: LruCache::new(NonZeroUsize::new(100).unwrap()),
             current_directory: Default::default(),
             input: Default::default(),
+            view_history: false,
             code_highlighter: CodeHighlighter::new(),
             highlight_index: Default::default(),
             file_opened: Default::default(),
@@ -113,17 +115,66 @@ impl MessageHolder {
         }
     }
 
+    pub fn submit_for_history(&mut self) {
+        let path_holder: Vec<&PathBuf> = self
+            .cache_holder
+            .iter()
+            .filter(|(path, _)| self.should_select(path.to_str().unwrap()))
+            .map(|(path, _)| path)
+            .collect();
+        assert!(!path_holder.is_empty());
+
+        let selected_file_path = path_holder[self.highlight_index];
+        assert!(selected_file_path.is_dir());
+        self.current_directory = (*selected_file_path).clone();
+        self.input = String::new();
+    }
+
     pub fn draw(&mut self, area: Rect, frame: &mut Frame) {
-        match self.file_opened.clone() {
-            None => {
-                if !self.current_directory.as_os_str().is_empty() {
-                    self.draw_file_view_search(area, frame);
+        if self.view_history {
+            self.draw_file_view_history_search(area, frame);
+        } else {
+            match self.file_opened.clone() {
+                None => {
+                    if !self.current_directory.as_os_str().is_empty() {
+                        self.draw_file_view_search(area, frame);
+                    }
+                }
+                Some(file_path) => {
+                    self.draw_file_view(area, frame, &file_path);
                 }
             }
-            Some(file_path) => {
-                self.draw_file_view(area, frame, &file_path);
+        }
+    }
+
+    fn draw_file_view_history_search(&mut self, area: Rect, frame: &mut Frame) {
+        let mut path_holder: Vec<ListItem> = self
+            .cache_holder
+            .iter()
+            .filter(|(key, _)| self.should_select(key.to_str().unwrap()))
+            .map(|(key, _)| {
+                ListItem::new(Line::from(key.to_string_lossy().into_owned()).style(
+                    if key.is_file() {
+                        Style::default()
+                    } else {
+                        Color::LightCyan.into()
+                    },
+                ))
+            })
+            .collect();
+
+        if !path_holder.is_empty() {
+            if path_holder.len() <= self.highlight_index {
+                self.highlight_index = path_holder.len() - 1;
             }
         }
+        if let Some(path) = path_holder.get_mut(self.highlight_index) {
+            *path = path.clone().add_modifier(Modifier::REVERSED);
+        };
+
+        let title = format!("History: {} items", path_holder.len());
+        let messages = List::new(path_holder).block(Block::default().title(title));
+        frame.render_widget(messages, area);
     }
 
     fn draw_file_view_search(&mut self, area: Rect, frame: &mut Frame) {

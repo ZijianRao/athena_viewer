@@ -117,6 +117,10 @@ impl App {
             match key_event.code {
                 KeyCode::Char('q') => self.exit = true,
                 KeyCode::Char('u') => self.message_holder.refresh_current_folder_cache(),
+                KeyCode::Char('h') => {
+                    self.input_mode = InputMode::FileSearchHistory;
+                    self.message_holder.view_history = true;
+                }
                 KeyCode::Tab => {
                     self.input_mode = InputMode::FileSearch;
                     self.message_holder.setup();
@@ -145,6 +149,40 @@ impl App {
                         self.input_mode = InputMode::FileView;
                     }
                     self.input.reset();
+                }
+                _ => {
+                    self.input.handle_event(&event);
+                    self.message_holder.highlight_index = 0;
+                    self.message_holder.update(self.input.value());
+                }
+            }
+        }
+    }
+
+    pub fn handle_file_search_history_event(&mut self) {
+        let event = event::read().unwrap();
+        if let Event::Key(key_event) = event {
+            match key_event.code {
+                KeyCode::Tab => {
+                    self.input_mode = InputMode::FileSearch;
+                    self.message_holder.view_history = false;
+                }
+                KeyCode::Up => {
+                    self.message_holder.highlight_index =
+                        self.message_holder.highlight_index.saturating_sub(1);
+                }
+                KeyCode::Down => {
+                    self.message_holder.highlight_index =
+                        self.message_holder.highlight_index.saturating_add(1);
+                }
+                KeyCode::Enter => {
+                    self.message_holder.submit_for_history();
+                    if self.message_holder.file_opened.is_some() {
+                        self.input_mode = InputMode::FileView;
+                    }
+                    self.input.reset();
+                    self.input_mode = InputMode::FileSearch;
+                    self.message_holder.view_history = false;
                 }
                 _ => {
                     self.input.handle_event(&event);

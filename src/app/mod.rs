@@ -20,6 +20,7 @@ enum InputMode {
     Normal,
     FileSearch,
     FileView,
+    FileSearchHistory,
 }
 
 pub mod draw;
@@ -35,6 +36,7 @@ impl App {
                 InputMode::FileView => self.handle_file_view_event(&mut last_tick, &tick_rate),
                 InputMode::Normal => self.handle_normal_event(),
                 InputMode::FileSearch => self.handle_file_search_event(),
+                InputMode::FileSearchHistory => self.handle_file_search_history_event(),
             }
             if self.exit {
                 return Ok(());
