@@ -225,14 +225,7 @@ impl MessageHolder {
             .content_length(file_text_info.max_line_length);
 
         frame.render_widget(file_preview, area);
-        // frame.render_stateful_widget(
-        //     Scrollbar::new(ScrollbarOrientation::VerticalRight).symbols(scrollbar::VERTICAL),
-        //     area.inner(Margin {
-        //         vertical: 1,
-        //         horizontal: 0,
-        //     }),
-        //     &mut self.vertical_scroll_state,
-        // );
+
         frame.render_stateful_widget(
             Scrollbar::new(ScrollbarOrientation::HorizontalBottom).symbols(scrollbar::HORIZONTAL),
             area.inner(Margin {

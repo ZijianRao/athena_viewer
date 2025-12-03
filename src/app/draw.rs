@@ -28,35 +28,39 @@ impl App {
         match self.input_mode {
             InputMode::Normal => {
                 instructions = Text::from(Line::from(vec![
-                    " Normal ".bold(),
-                    " Switch to File Search Mode ".into(),
+                    "Normal ".bold(),
+                    "Switch to".into(),
+                    " FileSearch ".bold(),
                     "<Tab>".light_blue().bold(),
                     " Quit ".into(),
                     "<Q>".light_blue().bold(),
                     " Update ".into(),
                     "<U>".light_blue().bold(),
-                    " Switch to File Search History Mode ".into(),
+                    " Switch to ".into(),
+                    "FileSearchHistory ".bold(),
                     "<H>".light_blue().bold(),
                 ]));
             }
             InputMode::FileSearch => {
                 instructions = Text::from(Line::from(vec![
-                    " FileSearch ".bold(),
-                    " Switch to Normal Mode ".into(),
+                    "FileSearch ".bold(),
+                    "Switch to".into(),
+                    " Normal ".bold(),
                     "<Tab>".light_blue().bold(),
                 ]));
             }
             InputMode::FileView => {
                 instructions = Text::from(Line::from(vec![
-                    " FileView".bold(),
-                    " Quit ".into(),
+                    " FileView ".bold(),
+                    "Quit ".into(),
                     "<Q>".light_blue().bold(),
                 ]));
             }
             InputMode::FileSearchHistory => {
                 instructions = Text::from(Line::from(vec![
-                    " File Search History".bold(),
-                    " Switch to File Search Mode ".into(),
+                    "FileSearchHistory".bold(),
+                    " Switch to".into(),
+                    " FileSearch".bold(),
                     "<Tab>".light_blue().bold(),
                 ]));
             }
