@@ -2,6 +2,7 @@ use std::io::{self};
 
 mod app;
 mod message_holder;
+mod state_holder;
 
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
