@@ -1,8 +1,14 @@
 use ratatui::crossterm::event::{self, Event, KeyCode};
+use ratatui::{
+    layout::Rect,
+    style::Stylize,
+    text::{Line, Text},
+    widgets::Paragraph,
+    Frame,
+};
+use tui_input::backend::crossterm::EventHandler;
 
 use crate::app::App;
-use crate::state_holder::state_holder::ViewMode;
-use tui_input::backend::crossterm::EventHandler;
 
 impl App {
     pub fn handle_edit_history_folder_view_event(&mut self) {
@@ -10,7 +16,7 @@ impl App {
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Tab => {
-                    self.state_holder.view_mode = ViewMode::Search;
+                    self.state_holder.to_search();
                     self.message_holder.view_history = false;
                 }
                 KeyCode::Up => {
@@ -24,10 +30,10 @@ impl App {
                 KeyCode::Enter => {
                     self.message_holder.submit_for_history();
                     if self.message_holder.file_opened.is_some() {
-                        self.state_holder.view_mode = ViewMode::FileView;
+                        self.state_holder.to_file_view();
                     }
                     self.input.reset();
-                    self.state_holder.view_mode = ViewMode::Search;
+                    self.state_holder.to_search();
                     self.message_holder.view_history = false;
                 }
                 _ => {
@@ -37,5 +43,15 @@ impl App {
                 }
             }
         }
+    }
+    pub fn draw_help_edit_history_folder_view(&mut self, help_area: Rect, frame: &mut Frame) {
+        let instructions = Text::from(Line::from(vec![
+            "FileSearchHistory".bold(),
+            " Switch to".into(),
+            " FileSearch".bold(),
+            "<Tab>".light_blue().bold(),
+        ]));
+        let help_message = Paragraph::new(instructions);
+        frame.render_widget(help_message, help_area);
     }
 }

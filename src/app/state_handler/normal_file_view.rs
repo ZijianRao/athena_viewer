@@ -9,7 +9,6 @@ use ratatui::{
 use std::time::{Duration, Instant};
 
 use crate::app::App;
-use crate::state_holder::state_holder::ViewMode;
 
 impl App {
     pub fn handle_normal_file_view_event(&mut self, last_tick: &mut Instant, tick_rate: &Duration) {
@@ -21,8 +20,7 @@ impl App {
                 match key_event.code {
                     KeyCode::Char('q') => {
                         self.message_holder.reset();
-
-                        self.state_holder.view_mode = ViewMode::Search;
+                        self.state_holder.restore_previous_state();
                     }
                     KeyCode::Char('j') | KeyCode::Down => {
                         self.message_holder.vertical_scroll = self

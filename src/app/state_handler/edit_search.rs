@@ -1,15 +1,21 @@
 use ratatui::crossterm::event::{self, Event, KeyCode};
+use ratatui::{
+    layout::Rect,
+    style::Stylize,
+    text::{Line, Text},
+    widgets::Paragraph,
+    Frame,
+};
+use tui_input::backend::crossterm::EventHandler;
 
 use crate::app::App;
-use crate::state_holder::state_holder::{InputMode, ViewMode};
-use tui_input::backend::crossterm::EventHandler;
 
 impl App {
     pub fn handle_edit_search_event(&mut self) {
         let event = event::read().unwrap();
         if let Event::Key(key_event) = event {
             match key_event.code {
-                KeyCode::Tab => self.state_holder.input_mode = InputMode::Normal,
+                KeyCode::Tab => self.state_holder.to_search(),
                 KeyCode::Up => {
                     self.message_holder.highlight_index =
                         self.message_holder.highlight_index.saturating_sub(1);
@@ -21,7 +27,7 @@ impl App {
                 KeyCode::Enter => {
                     self.message_holder.submit();
                     if self.message_holder.file_opened.is_some() {
-                        self.state_holder.view_mode = ViewMode::FileView;
+                        self.state_holder.to_file_view();
                     }
                     self.input.reset();
                 }
@@ -32,5 +38,16 @@ impl App {
                 }
             }
         }
+    }
+    pub fn draw_edit_search(&mut self, help_area: Rect, frame: &mut Frame) {
+        let instructions = Text::from(Line::from(vec![
+            "FileSearch ".bold(),
+            "Switch to".into(),
+            " Normal ".bold(),
+            "<Tab>".light_blue().bold(),
+        ]));
+
+        let help_message = Paragraph::new(instructions);
+        frame.render_widget(help_message, help_area);
     }
 }

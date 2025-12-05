@@ -8,7 +8,6 @@ use ratatui::{
 };
 
 use crate::app::App;
-use crate::state_holder::state_holder::{self};
 
 impl App {
     pub fn handle_normal_search_event(&mut self) {
@@ -18,10 +17,10 @@ impl App {
                 KeyCode::Char('q') => self.exit = true,
                 KeyCode::Char('u') => self.message_holder.refresh_current_folder_cache(),
                 KeyCode::Char('h') => {
-                    self.state_holder.view_mode = state_holder::ViewMode::HistoryFolderView;
+                    self.state_holder.to_history_view();
                 }
                 KeyCode::Tab => {
-                    self.state_holder.input_mode = state_holder::InputMode::Edit;
+                    self.state_holder.to_search_edit();
                     self.message_holder.setup();
                 }
                 _ => {}

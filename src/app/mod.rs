@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use ratatui::DefaultTerminal;
 use tui_input::Input;
 
-use crate::message_holder;
+use crate::message_holder::message_holder::MessageHolder;
 use crate::state_holder::state_holder::{InputMode, StateHolder, ViewMode};
 
 #[derive(Debug, Default)]
@@ -18,12 +18,14 @@ pub struct App {
     state_holder: StateHolder,
     input: Input,
     exit: bool,
-    message_holder: message_holder::message_holder::MessageHolder,
+    message_holder: MessageHolder,
 }
 
 pub mod state_handler;
 impl App {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+        use InputMode::*;
+        use ViewMode::*;
         let tick_rate = Duration::from_millis(200);
         let mut last_tick = Instant::now();
 
@@ -33,14 +35,12 @@ impl App {
                 self.state_holder.input_mode.clone(),
                 self.state_holder.view_mode.clone(),
             ) {
-                (InputMode::Normal, ViewMode::Search) => self.handle_normal_search_event(),
-                (InputMode::Normal, ViewMode::FileView) => {
+                (Normal, Search) => self.handle_normal_search_event(),
+                (Normal, FileView) => {
                     self.handle_normal_file_view_event(&mut last_tick, &tick_rate)
                 }
-                (InputMode::Edit, ViewMode::HistoryFolderView) => {
-                    self.handle_edit_history_folder_view_event()
-                }
-                (InputMode::Edit, ViewMode::Search) => self.handle_edit_search_event(),
+                (Edit, HistoryFolderView) => self.handle_edit_history_folder_view_event(),
+                (Edit, Search) => self.handle_edit_search_event(),
                 _ => (),
             }
             if self.exit {
@@ -49,6 +49,8 @@ impl App {
         }
     }
     pub fn draw(&mut self, frame: &mut Frame) {
+        use InputMode::*;
+        use ViewMode::*;
         let vertical = Layout::vertical([
             Constraint::Min(1),
             Constraint::Length(3),
@@ -60,14 +62,10 @@ impl App {
             self.state_holder.input_mode.clone(),
             self.state_holder.view_mode.clone(),
         ) {
-            (InputMode::Normal, ViewMode::Search) => self.draw_help_normal_search(help_area, frame),
-            (InputMode::Normal, ViewMode::FileView) => {
-                self.draw_help_normal_file_view(help_area, frame),
-            }
-            (InputMode::Edit, ViewMode::HistoryFolderView) => {
-                self.handle_edit_history_folder_view_event()
-            }
-            (InputMode::Edit, ViewMode::Search) => self.handle_edit_search_event(),
+            (Normal, Search) => self.draw_help_normal_search(help_area, frame),
+            (Normal, FileView) => self.draw_help_normal_file_view(help_area, frame),
+            (Edit, HistoryFolderView) => self.draw_help_edit_history_folder_view(help_area, frame),
+            (Edit, Search) => self.draw_edit_search(help_area, frame),
             _ => (),
         }
         // self.draw_help_area(help_area, frame);
