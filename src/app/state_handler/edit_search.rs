@@ -15,7 +15,7 @@ impl App {
         let event = event::read().unwrap();
         if let Event::Key(key_event) = event {
             match key_event.code {
-                KeyCode::Tab => self.state_holder.to_search(),
+                KeyCode::Tab => self.state_holder.borrow_mut().to_search(),
                 KeyCode::Up => {
                     self.message_holder.highlight_index =
                         self.message_holder.highlight_index.saturating_sub(1);
@@ -26,9 +26,6 @@ impl App {
                 }
                 KeyCode::Enter => {
                     self.message_holder.submit();
-                    if self.message_holder.file_opened.is_some() {
-                        self.state_holder.to_file_view();
-                    }
                     self.input.reset();
                 }
                 _ => {

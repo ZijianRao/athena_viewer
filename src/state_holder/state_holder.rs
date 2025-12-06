@@ -35,15 +35,23 @@ impl StateHolder {
         self.input_mode = Edit;
         self.view_mode = Search;
     }
-    pub fn to_history_view(&mut self) {
+    pub fn to_history_search(&mut self) {
         self.save_previous_state();
-        self.input_mode = Normal;
+        self.input_mode = Edit;
         self.view_mode = HistoryFolderView;
     }
     pub fn to_file_view(&mut self) {
         self.save_previous_state();
         self.input_mode = Normal;
         self.view_mode = FileView;
+    }
+
+    pub fn is_edit(&self) -> bool {
+        self.input_mode == Edit
+    }
+
+    pub fn is_history_search(&self) -> bool {
+        self.view_mode == HistoryFolderView
     }
 
     fn save_previous_state(&mut self) {

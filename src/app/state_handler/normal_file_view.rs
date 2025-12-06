@@ -20,7 +20,7 @@ impl App {
                 match key_event.code {
                     KeyCode::Char('q') => {
                         self.message_holder.reset();
-                        self.state_holder.restore_previous_state();
+                        self.state_holder.borrow_mut().restore_previous_state();
                     }
                     KeyCode::Char('j') | KeyCode::Down => {
                         self.message_holder.vertical_scroll = self
@@ -117,10 +117,9 @@ impl App {
     }
     pub fn draw_help_normal_file_view(&mut self, help_area: Rect, frame: &mut Frame) {
         let instructions = Text::from(Line::from(vec![
-            "FileSearch ".bold(),
-            "Switch to".into(),
-            " Normal ".bold(),
-            "<Tab>".light_blue().bold(),
+            "FileView ".bold(),
+            " Quit ".into(),
+            "<Q>".light_blue().bold(),
         ]));
         let help_message = Paragraph::new(instructions);
         frame.render_widget(help_message, help_area);

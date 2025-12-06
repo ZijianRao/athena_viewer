@@ -1,7 +1,5 @@
 use std::env;
 
-use crate::message_holder::code_highlighter::CodeHighlighter;
-use crate::message_holder::file_helper::{FileGroupHolder, FileHolder, FileTextInfo};
 use lru::LruCache;
 use ratatui::style::Stylize;
 use ratatui::symbols::scrollbar;
@@ -12,16 +10,22 @@ use ratatui::{
     widgets::{Block, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame,
 };
+use std::cell::RefCell;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
+use std::rc::Rc;
+
+use crate::message_holder::code_highlighter::CodeHighlighter;
+use crate::message_holder::file_helper::{FileGroupHolder, FileHolder, FileTextInfo};
+use crate::state_holder::state_holder::StateHolder;
 
 #[derive(Debug)]
 pub struct MessageHolder {
+    state_holder: Rc<RefCell<StateHolder>>,
     cache_holder: LruCache<PathBuf, FileGroupHolder>,
     current_directory: PathBuf,
     input: String,
     code_highlighter: CodeHighlighter,
-    pub view_history: bool,
     pub highlight_index: usize,
     pub file_opened: Option<PathBuf>,
     pub file_text_info: Option<FileTextInfo>,
@@ -31,13 +35,13 @@ pub struct MessageHolder {
     pub horizontal_scroll: usize,
 }
 
-impl Default for MessageHolder {
-    fn default() -> Self {
-        Self {
+impl MessageHolder {
+    pub fn new(state_holder: Rc<RefCell<StateHolder>>) -> Self {
+        MessageHolder {
+            state_holder: state_holder,
             cache_holder: LruCache::new(NonZeroUsize::new(100).unwrap()),
             current_directory: Default::default(),
             input: Default::default(),
-            view_history: false,
             code_highlighter: CodeHighlighter::new(),
             highlight_index: Default::default(),
             file_opened: Default::default(),
@@ -48,8 +52,6 @@ impl Default for MessageHolder {
             horizontal_scroll: Default::default(),
         }
     }
-}
-impl MessageHolder {
     pub fn update(&mut self, input: &str) {
         self.input = input.to_string();
     }
@@ -107,6 +109,7 @@ impl MessageHolder {
                     self.file_text_info =
                         Some(FileTextInfo::new(&new_entrypoint, &self.code_highlighter));
                     self.file_opened = Some(new_entrypoint);
+                    self.state_holder.borrow_mut().to_file_view();
                 }
             }
             Err(_) => {
@@ -131,7 +134,7 @@ impl MessageHolder {
     }
 
     pub fn draw(&mut self, area: Rect, frame: &mut Frame) {
-        if self.view_history {
+        if self.state_holder.borrow().is_history_search() {
             self.draw_file_view_history_search(area, frame);
         } else {
             match self.file_opened.clone() {
