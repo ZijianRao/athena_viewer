@@ -44,8 +44,8 @@ impl App {
         loop {
             terminal.draw(|frame| self.draw(frame))?;
 
-            let input_mode = self.state_holder.borrow().input_mode.clone();
-            let view_mode = self.state_holder.borrow().view_mode.clone();
+            let input_mode = self.state_holder.borrow().input_mode;
+            let view_mode = self.state_holder.borrow().view_mode;
             match (input_mode, view_mode) {
                 (Normal, Search) => self.handle_normal_search_event(),
                 (Normal, FileView) => {
@@ -70,9 +70,9 @@ impl App {
         ]);
 
         let [messages_area, input_area, help_area] = vertical.areas(frame.area());
-        let input_mode = self.state_holder.borrow().input_mode.clone();
-        let view_mode = self.state_holder.borrow().view_mode.clone();
-        match (input_mode.clone(), view_mode.clone()) {
+        let input_mode = self.state_holder.borrow().input_mode;
+        let view_mode = self.state_holder.borrow().view_mode;
+        match (input_mode, view_mode) {
             (Normal, Search) => self.draw_help_normal_search(help_area, frame),
             (Normal, FileView) => self.draw_help_normal_file_view(help_area, frame),
             (Edit, HistoryFolderView) => self.draw_help_edit_history_folder_view(help_area, frame),

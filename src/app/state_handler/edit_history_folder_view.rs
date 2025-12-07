@@ -12,7 +12,7 @@ use crate::app::App;
 
 impl App {
     pub fn handle_edit_history_folder_view_event(&mut self) {
-        let event = event::read().unwrap();
+        let event = event::read().expect("Unable to handle key press event!");
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search(),

@@ -33,7 +33,9 @@ impl CodeHighlighter {
         let mut lines = Vec::new();
 
         for line in LinesWithEndings::from(&code) {
-            let ranges = highlighter.highlight_line(line, &self.syntax_set).unwrap();
+            let ranges = highlighter
+                .highlight_line(line, &self.syntax_set)
+                .expect("Unable to apply highlight for text file!");
             let spans = ranges
                 .into_iter()
                 .map(|(style, text)| {

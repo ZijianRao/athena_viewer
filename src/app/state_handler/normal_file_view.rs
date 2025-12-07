@@ -14,8 +14,8 @@ impl App {
     pub fn handle_normal_file_view_event(&mut self, last_tick: &mut Instant, tick_rate: &Duration) {
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
-        if event::poll(timeout).unwrap() {
-            let event = event::read().unwrap();
+        if event::poll(timeout).expect("Unable handle the timeout applied!") {
+            let event = event::read().expect("Unable to handle key press event!");
             if let Event::Key(key_event) = event {
                 match key_event.code {
                     KeyCode::Char('q') => {
@@ -23,11 +23,14 @@ impl App {
                         self.state_holder.borrow_mut().restore_previous_state();
                     }
                     KeyCode::Char('j') | KeyCode::Down => {
-                        self.message_holder.vertical_scroll = self
-                            .message_holder
-                            .vertical_scroll
-                            .saturating_add(1)
-                            .min(self.message_holder.file_text_info.as_ref().unwrap().n_rows);
+                        self.message_holder.vertical_scroll =
+                            self.message_holder.vertical_scroll.saturating_add(1).min(
+                                self.message_holder
+                                    .file_text_info
+                                    .as_ref()
+                                    .expect("Unable to get ref of text from opened text file")
+                                    .n_rows,
+                            );
                         self.message_holder.vertical_scroll_state = self
                             .message_holder
                             .vertical_scroll_state
@@ -55,7 +58,7 @@ impl App {
                                 self.message_holder
                                     .file_text_info
                                     .as_ref()
-                                    .unwrap()
+                                    .expect("Unable to get ref of text from opened text file")
                                     .max_line_length,
                             );
                         self.message_holder.horizontal_scroll_state = self
@@ -80,7 +83,7 @@ impl App {
                             .message_holder
                             .file_text_info
                             .as_ref()
-                            .unwrap()
+                            .expect("Unable to get ref of text from opened text file")
                             .n_rows
                             .saturating_sub(30);
                         self.message_holder.vertical_scroll_state = self
@@ -89,11 +92,14 @@ impl App {
                             .position(self.message_holder.vertical_scroll);
                     }
                     KeyCode::PageDown => {
-                        self.message_holder.vertical_scroll = self
-                            .message_holder
-                            .vertical_scroll
-                            .saturating_add(30)
-                            .min(self.message_holder.file_text_info.as_ref().unwrap().n_rows);
+                        self.message_holder.vertical_scroll =
+                            self.message_holder.vertical_scroll.saturating_add(30).min(
+                                self.message_holder
+                                    .file_text_info
+                                    .as_ref()
+                                    .expect("Unable to get ref of text from opened text file")
+                                    .n_rows,
+                            );
                         self.message_holder.vertical_scroll_state = self
                             .message_holder
                             .vertical_scroll_state

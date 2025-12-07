@@ -54,7 +54,7 @@ impl From<PathBuf> for FileHolder {
         let file_name = path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
-            .unwrap();
+            .expect(&format!("Unable to get file name for {:?}", path));
 
         FileHolder {
             file_name: file_name,
@@ -77,7 +77,7 @@ impl From<PathBuf> for FileGroupHolder {
 
         entries.extend(
             fs::read_dir(&path)
-                .unwrap()
+                .expect(&format!("Unable to read directory for {:?}", path))
                 .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path()))),
         );
         Self {

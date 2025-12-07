@@ -1,14 +1,14 @@
 use InputMode::*;
 use ViewMode::*;
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum InputMode {
     #[default]
     Normal,
     Edit,
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum ViewMode {
     #[default]
     Search,

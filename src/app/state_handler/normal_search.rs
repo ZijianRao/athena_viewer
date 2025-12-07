@@ -11,7 +11,7 @@ use crate::app::App;
 
 impl App {
     pub fn handle_normal_search_event(&mut self) {
-        let event = event::read().unwrap();
+        let event = event::read().expect("Unable to handle key press event!");
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Char('q') => self.exit = true,

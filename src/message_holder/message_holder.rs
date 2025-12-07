@@ -38,8 +38,10 @@ pub struct MessageHolder {
 impl MessageHolder {
     pub fn new(state_holder: Rc<RefCell<StateHolder>>) -> Self {
         MessageHolder {
-            state_holder: state_holder,
-            cache_holder: LruCache::new(NonZeroUsize::new(100).unwrap()),
+            state_holder,
+            cache_holder: LruCache::new(
+                NonZeroUsize::new(100).expect("Unable to initiate fixed size lru cache"),
+            ),
             current_directory: Default::default(),
             input: Default::default(),
             code_highlighter: CodeHighlighter::new(),
@@ -71,7 +73,7 @@ impl MessageHolder {
 
     pub fn setup(&mut self) {
         if self.current_directory.as_os_str().is_empty() {
-            self.current_directory = env::current_dir().unwrap();
+            self.current_directory = env::current_dir().expect("Unable to get current directory!");
         }
 
         let holder = FileGroupHolder::from(self.current_directory.clone());
@@ -83,7 +85,10 @@ impl MessageHolder {
         let mut messages = self
             .cache_holder
             .get(&self.current_directory)
-            .unwrap()
+            .expect(&format!(
+                "Unable to get folder cache for {:?}",
+                self.current_directory
+            ))
             .child
             .clone();
         let path_holder: Vec<FileHolder> = std::mem::take(&mut messages)
@@ -122,7 +127,12 @@ impl MessageHolder {
         let path_holder: Vec<&PathBuf> = self
             .cache_holder
             .iter()
-            .filter(|(path, _)| self.should_select(path.to_str().unwrap()))
+            .filter(|(path, _)| {
+                self.should_select(
+                    path.to_str()
+                        .expect(&format!("Unable to get path {:?}", path)),
+                )
+            })
             .map(|(path, _)| path)
             .collect();
         assert!(!path_holder.is_empty());
@@ -154,7 +164,12 @@ impl MessageHolder {
         let mut path_holder: Vec<ListItem> = self
             .cache_holder
             .iter()
-            .filter(|(key, _)| self.should_select(key.to_str().unwrap()))
+            .filter(|(key, _)| {
+                self.should_select(
+                    key.to_str()
+                        .expect(&format!("Unable to get file name for {:?}", key)),
+                )
+            })
             .map(|(key, _)| {
                 ListItem::new(Line::from(key.to_string_lossy().into_owned()).style(
                     if key.is_file() {
@@ -179,7 +194,13 @@ impl MessageHolder {
     }
 
     fn draw_file_view_search(&mut self, area: Rect, frame: &mut Frame) {
-        let current_file_holder = self.cache_holder.peek(&self.current_directory).unwrap();
+        let current_file_holder = self
+            .cache_holder
+            .peek(&self.current_directory)
+            .expect(&format!(
+                "Unable to get cache for {:?}",
+                self.current_directory
+            ));
 
         let mut path_holder: Vec<ListItem> = current_file_holder
             .child
@@ -211,7 +232,10 @@ impl MessageHolder {
     }
 
     fn draw_file_view(&mut self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
-        let file_text_info = self.file_text_info.as_ref().unwrap();
+        let file_text_info = self
+            .file_text_info
+            .as_ref()
+            .expect("Unable to get text file info!");
         let file_preview = Paragraph::new(file_text_info.formatted_text.clone())
             .block(Block::default().title(file_path.to_string_lossy().into_owned()))
             .scroll((self.vertical_scroll as u16, self.horizontal_scroll as u16));
