@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Athena Viewer is an interactive terminal character echo application built in Rust. It provides a Claude Code-like interface with immediate character feedback, sliding window display, and clean input/output separation. The application demonstrates advanced terminal manipulation techniques and real-time character processing.
+Athena Viewer is a terminal-based file viewer application built in Rust using the `ratatui` TUI framework. It provides syntax-highlighted file viewing, directory navigation, and search functionality with a modal interface (Normal/Edit modes).
+
+## How We Use Claude Code
+
+Claude Code is used **primarily as a code coach** in this project:
+- **Code review and feedback**: Analyzing Rust code patterns and suggesting improvements
+- **Learning guidance**: Providing structured feedback on Rust idioms and best practices
+- **Architecture advice**: Suggesting better design patterns and organization
+- **Error handling guidance**: Helping implement proper Rust error handling patterns
+
+The focus is on **learning Rust through code review** rather than automated code generation.
 
 ## Development Commands
 
@@ -21,87 +31,91 @@ Athena Viewer is an interactive terminal character echo application built in Rus
 
 ## Project Structure
 
-- `src/main.rs` - Main entry point containing the interactive character echo application (289 lines)
-- `Cargo.toml` - Project configuration and dependencies (uses libc v0.2 for terminal control)
+```
+src/
+├── main.rs              # Application entry point
+├── app/                 # Main application logic
+│   ├── mod.rs          # App struct and main loop
+│   └── state_handler/  # State-specific event handlers
+├── message_holder/      # File viewing and message display
+│   ├── mod.rs
+│   ├── message_holder.rs
+│   ├── file_helper.rs
+│   └── code_highlighter.rs
+└── state_holder/       # Application state management
+    ├── mod.rs
+    └── state_holder.rs
+```
+
+- `Cargo.toml` - Project configuration and dependencies
 - `Cargo.lock` - Dependency lock file for reproducible builds
 - `CLAUDE.md` - This documentation file
+- `RUST_CODE_REVIEW.md` - Code review feedback and improvement suggestions
 - `target/` - Build output directory (gitignored)
 
 ## Current Features
 
 ### Core Functionality
-- **Immediate Character Echo**: Characters appear as you type without Enter confirmation
-- **Sliding Window Display**: Most recent content appears closest to input area
-- **Bottom-Aligned Output**: Content positions itself naturally at the bottom of the output area
-- **Input Box Boundaries**: Clean visual separation with separator lines above and below input
-
-### Terminal Features
-- **Raw Terminal Mode**: Direct character input without line buffering
-- **Multi-threaded Architecture**: Separate input thread for responsive character handling
-- **ANSI Escape Sequences**: Advanced terminal control for positioning and formatting
-- **Cross-Platform Support**: Uses libc for Unix-like system terminal control
+- **Syntax-highlighted file viewing**: Uses `syntect` crate for code highlighting
+- **Modal interface**: Normal mode (navigation) and Edit mode (search/input)
+- **Directory navigation**: Browse and select files in current directory
+- **File search**: Search through files with highlighting
+- **LRU caching**: Efficient file caching with configurable size
+- **State machine**: Enum-driven state management (`InputMode`, `ViewMode`)
 
 ### User Interface
-- **Fixed Layout**: 24-line terminal layout with header, output area, and input box
-- **Visual Separators**: ═ lines create clear boundaries between sections
-- **Cursor Positioning**: Absolute positioning for consistent layout
-- **Clean Exit**: Proper terminal mode restoration
+- **TUI framework**: Built with `ratatui` and `crossterm`
+- **Input handling**: Uses `tui-input` for text input
+- **Help display**: Context-sensitive help in different modes
+- **Visual feedback**: Clear mode indicators and status
 
 ## Technical Implementation
 
 ### Key Components
-- `EchoState` struct: Manages current input, output history, and display logic (max_lines: 5)
-- `enable_raw_mode()`/`disable_raw_mode()`: Terminal mode control functions using libc termios
-- `render_echo_display()`: Main rendering function with bottom-aligned layout and ANSI escape sequences
-- `get_sliding_display_output()`: Sliding window logic for content management (15 output lines max)
-- Multi-threaded input processing with mpsc channels for responsive character handling
-- Input thread handles raw character reading and special key detection (ESC, Ctrl+C, Enter, Backspace)
+- `App` struct: Main application state and rendering
+- `StateHolder`: Manages application mode (`InputMode`, `ViewMode`)
+- `MessageHolder`: Handles file loading, caching, and display
+- `CodeHighlighter`: Syntax highlighting using syntect
+- State handlers: Mode-specific event handling in `app/state_handler/`
 
 ### Dependencies
-- `libc`: Low-level system calls for terminal control (tcgetattr, tcsetattr)
-- `std::io::Write`: Output handling and flushing
-- `std::sync::mpsc`: Inter-thread communication
-- `std::thread`: Concurrent input processing
+- `ratatui`: Terminal user interface framework
+- `crossterm`: Cross-platform terminal operations
+- `tui-input`: Text input handling
+- `syntect`: Syntax highlighting
+- `lru`: LRU caching for files
+- `chrono`: Date/time handling
 
 ## Development Notes
 
 ### Architecture Decisions
-- Uses raw terminal mode for immediate character input
-- Implements sliding window to handle content overflow gracefully
-- Bottom-aligned display creates natural reading flow
-- Simple exit behavior leaves content in scrollback buffer
-- Multi-threaded design ensures responsive character processing
-
-### Terminal Requirements
-- Requires a Unix-like terminal environment
-- Needs raw terminal mode support
-- 24-line minimum terminal height recommended
-- ANSI escape sequence support required
+- **Single-threaded event loop**: Simple blocking event reading
+- **Shared mutable state**: Uses `Rc<RefCell<T>>` for shared state
+- **Enum-driven state machine**: Clear mode transitions
+- **Modular organization**: Separated by concern (app, state, messages)
 
 ### Known Limitations
-- Scrollback buffer clearing is terminal-dependent and not implemented
-- Terminal size is assumed to be 24 lines minimum
-- Currently designed for Unix-like systems only
+- **Error handling**: Needs improvement (multiple `unwrap()` calls)
+- **Testing**: No unit or integration tests
+- **Documentation**: Missing Rustdoc comments
+- **Safety**: No path traversal protection or file size limits
 
-## Recent Development & Code Quality
+## Code Review Focus Areas
 
-### Latest Improvements
-Based on recent commit history, the project has undergone several refinements:
+When reviewing code in this project, focus on:
+1. **Rust idioms**: Ownership, borrowing, error handling patterns
+2. **Error handling**: Replace `unwrap()` with proper error propagation
+3. **Code organization**: Module structure and separation of concerns
+4. **Performance**: String allocations, caching efficiency
+5. **Safety**: File system access, bounds checking
+6. **Testing**: Adding unit tests for core logic
 
-- **Code Quality**: Cleaned up code formatting and improved overall code quality
-- **Documentation**: Updated and simplified documentation with clearer explanations
-- **Output Handling**: Fixed immediate character echo and implemented bottom-aligned sliding window
-- **Visual Design**: Added two-line separator to properly bound the input area
-- **Performance**: Reduced gap between input and output areas for better UX
+## Recent Development
 
-### Development Best Practices
-- Code follows Rust style guidelines (`cargo fmt` compliant)
-- Linter passes with clean results (`cargo clippy`)
-- Error handling with proper Result types and user-friendly error messages
-- Thread-safe communication using mpsc channels
-- Proper resource cleanup with terminal mode restoration
+Based on commit history, recent improvements include:
+- State management refactoring
+- Input/output state separation
+- Code quality improvements
+- Documentation cleanup
 
-### Build Status
-- Compiles cleanly on Rust stable toolchain
-- Minimal external dependencies (only libc for system calls)
-- Efficient binary size and memory footprint
+See `RUST_CODE_REVIEW.md` for detailed code review feedback and improvement suggestions.
