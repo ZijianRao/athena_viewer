@@ -167,9 +167,7 @@ impl MessageHolder {
             .collect();
 
         if !path_holder.is_empty() {
-            if path_holder.len() <= self.highlight_index {
-                self.highlight_index = path_holder.len() - 1;
-            }
+            self.highlight_index = self.highlight_index % path_holder.len();
         }
         if let Some(path) = path_holder.get_mut(self.highlight_index) {
             *path = path.clone().add_modifier(Modifier::REVERSED);
@@ -197,9 +195,7 @@ impl MessageHolder {
             .collect();
 
         if !path_holder.is_empty() {
-            if path_holder.len() <= self.highlight_index {
-                self.highlight_index = path_holder.len() - 1;
-            }
+            self.highlight_index = self.highlight_index % path_holder.len();
         }
         if let Some(path) = path_holder.get_mut(self.highlight_index) {
             *path = path.clone().add_modifier(Modifier::REVERSED);
