@@ -7,13 +7,16 @@ use ratatui::{
 use std::cell::RefCell;
 use std::io::{self};
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use ratatui::DefaultTerminal;
 use tui_input::Input;
 
 use crate::message_holder::message_holder::MessageHolder;
 use crate::state_holder::state_holder::{InputMode, StateHolder, ViewMode};
+
+const MIN_INPUT_WIDTH: u16 = 3;
+const INPUT_WIDTH_PADDING: u16 = 3;
 
 #[derive(Debug)]
 pub struct App {
@@ -38,7 +41,6 @@ impl App {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         use InputMode::*;
         use ViewMode::*;
-        let tick_rate = Duration::from_millis(200);
         let mut last_tick = Instant::now();
 
         loop {
@@ -48,9 +50,7 @@ impl App {
             let view_mode = self.state_holder.borrow().view_mode;
             match (input_mode, view_mode) {
                 (Normal, Search) => self.handle_normal_search_event(),
-                (Normal, FileView) => {
-                    self.handle_normal_file_view_event(&mut last_tick, &tick_rate)
-                }
+                (Normal, FileView) => self.handle_normal_file_view_event(&mut last_tick),
                 (Edit, HistoryFolderView) => self.handle_edit_history_folder_view_event(),
                 (Edit, Search) => self.handle_edit_search_event(),
                 _ => (),
@@ -85,7 +85,7 @@ impl App {
 
     pub fn draw_input_area(&self, area: Rect, frame: &mut Frame) {
         // keep 2 for boarders and 1 for cursor
-        let width = area.width.max(3) - 3;
+        let width = area.width.max(MIN_INPUT_WIDTH) - INPUT_WIDTH_PADDING;
         let scroll = self.input.visual_scroll(width as usize);
 
         let style;

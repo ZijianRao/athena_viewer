@@ -19,6 +19,11 @@ use crate::message_holder::code_highlighter::CodeHighlighter;
 use crate::message_holder::file_helper::{FileGroupHolder, FileHolder, FileTextInfo};
 use crate::state_holder::state_holder::StateHolder;
 
+const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(100) {
+    Some(size) => size,
+    None => panic!("DEFAULT_CACHE_SIZE must be non-zero"),
+};
+
 #[derive(Debug)]
 pub struct MessageHolder {
     state_holder: Rc<RefCell<StateHolder>>,
@@ -39,9 +44,7 @@ impl MessageHolder {
     pub fn new(state_holder: Rc<RefCell<StateHolder>>) -> Self {
         MessageHolder {
             state_holder,
-            cache_holder: LruCache::new(
-                NonZeroUsize::new(100).expect("Unable to initiate fixed size lru cache"),
-            ),
+            cache_holder: LruCache::new(DEFAULT_CACHE_SIZE),
             current_directory: Default::default(),
             input: Default::default(),
             code_highlighter: CodeHighlighter::new(),

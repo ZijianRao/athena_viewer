@@ -9,10 +9,11 @@ use ratatui::{
 use std::time::{Duration, Instant};
 
 use crate::app::App;
+const TICK_RATE: Duration = Duration::from_millis(200);
 
 impl App {
-    pub fn handle_normal_file_view_event(&mut self, last_tick: &mut Instant, tick_rate: &Duration) {
-        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+    pub fn handle_normal_file_view_event(&mut self, last_tick: &mut Instant) {
+        let timeout = TICK_RATE.saturating_sub(last_tick.elapsed());
 
         if event::poll(timeout).expect("Unable handle the timeout applied!") {
             let event = event::read().expect("Unable to handle key press event!");
@@ -117,7 +118,7 @@ impl App {
                 }
             }
         }
-        if last_tick.elapsed() >= *tick_rate {
+        if last_tick.elapsed() >= TICK_RATE {
             *last_tick = Instant::now();
         }
     }
