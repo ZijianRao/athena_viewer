@@ -15,6 +15,7 @@ pub struct FileTextInfo {
 
 #[derive(Debug, Clone)]
 pub struct FileHolder {
+    pub parent: PathBuf,
     pub file_name: String,
     pub is_file: bool,
 }
@@ -56,10 +57,21 @@ impl From<PathBuf> for FileHolder {
             .map(|name| name.to_string_lossy().into_owned())
             .expect(&format!("Unable to get file name for {:?}", path));
 
+        let is_file = path.is_file();
         FileHolder {
+            parent: path
+                .parent()
+                .expect("Must have a valid parent folder")
+                .to_path_buf(),
             file_name: file_name,
-            is_file: path.is_file(),
+            is_file: is_file,
         }
+    }
+}
+
+impl FileHolder {
+    pub fn to_path(&self) -> Result<PathBuf, std::io::Error> {
+        self.parent.join(self.file_name.clone()).canonicalize()
     }
 }
 
@@ -70,6 +82,7 @@ impl From<PathBuf> for FileGroupHolder {
         // add if not at root
         if let Some(_parent) = path.parent() {
             entries.push(FileHolder {
+                parent: path.clone(),
                 file_name: "..".to_string(),
                 is_file: false,
             })

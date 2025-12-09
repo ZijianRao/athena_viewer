@@ -16,12 +16,11 @@ impl App {
             match key_event.code {
                 KeyCode::Char('q') => self.exit = true,
                 KeyCode::Char('u') => self.message_holder.refresh_current_folder_cache(),
-                KeyCode::Char('h') => self.state_holder.borrow_mut().to_history_search(),
-
-                KeyCode::Tab => {
-                    self.state_holder.borrow_mut().to_search_edit();
-                    self.message_holder.setup();
+                KeyCode::Char('h') => {
+                    self.state_holder.borrow_mut().to_history_search();
+                    self.message_holder.reset();
                 }
+                KeyCode::Tab => self.state_holder.borrow_mut().to_search_edit(),
                 _ => {}
             }
         }

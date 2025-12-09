@@ -1,6 +1,3 @@
-use std::env;
-
-use lru::LruCache;
 use ratatui::style::Stylize;
 use ratatui::symbols::scrollbar;
 use ratatui::{
@@ -11,26 +8,20 @@ use ratatui::{
     Frame,
 };
 use std::cell::RefCell;
-use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::message_holder::code_highlighter::CodeHighlighter;
-use crate::message_holder::file_helper::{FileGroupHolder, FileHolder, FileTextInfo};
+use crate::message_holder::file_helper::{FileHolder, FileTextInfo};
+use crate::message_holder::folder_holder::FolderHolder;
 use crate::state_holder::state_holder::StateHolder;
-
-const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(100) {
-    Some(size) => size,
-    None => panic!("DEFAULT_CACHE_SIZE must be non-zero"),
-};
 
 #[derive(Debug)]
 pub struct MessageHolder {
     state_holder: Rc<RefCell<StateHolder>>,
-    cache_holder: LruCache<PathBuf, FileGroupHolder>,
-    current_directory: PathBuf,
-    input: String,
+    folder_holder: FolderHolder,
     code_highlighter: CodeHighlighter,
+
     pub highlight_index: usize,
     pub file_opened: Option<PathBuf>,
     pub file_text_info: Option<FileTextInfo>,
@@ -42,12 +33,11 @@ pub struct MessageHolder {
 
 impl MessageHolder {
     pub fn new(state_holder: Rc<RefCell<StateHolder>>) -> Self {
+        let state_holder_ref = Rc::clone(&state_holder);
         MessageHolder {
             state_holder,
-            cache_holder: LruCache::new(DEFAULT_CACHE_SIZE),
-            current_directory: Default::default(),
-            input: Default::default(),
             code_highlighter: CodeHighlighter::new(),
+            folder_holder: FolderHolder::new(state_holder_ref),
             highlight_index: Default::default(),
             file_opened: Default::default(),
             file_text_info: Default::default(),
@@ -58,61 +48,32 @@ impl MessageHolder {
         }
     }
     pub fn update(&mut self, input: &str) {
-        self.input = input.to_string();
+        self.folder_holder.update(input);
     }
 
     pub fn refresh_current_folder_cache(&mut self) {
-        let holder = FileGroupHolder::from(self.current_directory.clone());
-        self.cache_holder
-            .put(self.current_directory.clone(), holder);
+        self.folder_holder.refresh();
     }
 
     pub fn reset(&mut self) {
-        self.input.clear();
+        self.folder_holder.update("");
         self.file_opened = None;
         self.file_text_info = None;
-        self.setup();
-    }
-
-    pub fn setup(&mut self) {
-        if self.current_directory.as_os_str().is_empty() {
-            self.current_directory = env::current_dir().expect("Unable to get current directory!");
-        }
-
-        let holder = FileGroupHolder::from(self.current_directory.clone());
-        self.cache_holder
-            .put(self.current_directory.clone(), holder);
     }
 
     pub fn submit(&mut self) {
-        let mut messages = self
-            .cache_holder
-            .get(&self.current_directory)
-            .expect(&format!(
-                "Unable to get folder cache for {:?}",
-                self.current_directory
-            ))
-            .child
-            .clone();
-        let path_holder: Vec<FileHolder> = std::mem::take(&mut messages)
-            .into_iter()
-            .filter(|entry| self.should_select(&entry.file_name))
-            .collect();
-        assert!(!path_holder.is_empty());
+        let path_holder = &self.folder_holder.selected_path_holder;
 
-        let filename = &path_holder[self.highlight_index].file_name;
-        let new_entrypoint_canonicalized_result =
-            self.current_directory.join(filename).canonicalize();
+        if !path_holder.is_empty() {
+            self.highlight_index = self.highlight_index % path_holder.len();
+        }
+
+        let new_entrypoint_canonicalized_result = self.folder_holder.submit(self.highlight_index);
         match new_entrypoint_canonicalized_result {
             Ok(new_entrypoint) => {
                 if new_entrypoint.is_dir() {
-                    self.current_directory = new_entrypoint;
-                    if self.cache_holder.get(&self.current_directory).is_none() {
-                        let holder = FileGroupHolder::from(self.current_directory.clone());
-                        self.cache_holder
-                            .put(self.current_directory.clone(), holder);
-                    }
-                    self.input = String::new();
+                    self.folder_holder
+                        .submit_new_working_directory(new_entrypoint);
                 } else {
                     self.file_text_info =
                         Some(FileTextInfo::new(&new_entrypoint, &self.code_highlighter));
@@ -120,97 +81,24 @@ impl MessageHolder {
                     self.state_holder.borrow_mut().to_file_view();
                 }
             }
-            Err(_) => {
-                self.setup();
-            }
+            Err(_) => {}
         }
-    }
-
-    pub fn submit_for_history(&mut self) {
-        let path_holder: Vec<&PathBuf> = self
-            .cache_holder
-            .iter()
-            .filter(|(path, _)| {
-                self.should_select(
-                    path.to_str()
-                        .expect(&format!("Unable to get path {:?}", path)),
-                )
-            })
-            .map(|(path, _)| path)
-            .collect();
-        assert!(!path_holder.is_empty());
-
-        let selected_file_path = path_holder[self.highlight_index];
-        assert!(selected_file_path.is_dir());
-        self.current_directory = (*selected_file_path).clone();
-        self.input = String::new();
     }
 
     pub fn draw(&mut self, area: Rect, frame: &mut Frame) {
-        if self.state_holder.borrow().is_history_search() {
-            self.draw_file_view_history_search(area, frame);
-        } else {
-            match self.file_opened.clone() {
-                None => {
-                    if !self.current_directory.as_os_str().is_empty() {
-                        self.draw_file_view_search(area, frame);
-                    }
-                }
-                Some(file_path) => {
-                    self.draw_file_view(area, frame, &file_path);
-                }
-            }
+        match self.file_opened.clone() {
+            None => self.draw_folder_view(area, frame),
+            Some(file_path) => self.draw_file_view(area, frame, &file_path),
         }
     }
 
-    fn draw_file_view_history_search(&mut self, area: Rect, frame: &mut Frame) {
+    fn draw_folder_view(&mut self, area: Rect, frame: &mut Frame) {
         let mut path_holder: Vec<ListItem> = self
-            .cache_holder
+            .folder_holder
+            .selected_path_holder
             .iter()
-            .filter(|(key, _)| {
-                self.should_select(
-                    key.to_str()
-                        .expect(&format!("Unable to get file name for {:?}", key)),
-                )
-            })
-            .map(|(key, _)| {
-                ListItem::new(Line::from(key.to_string_lossy().into_owned()).style(
-                    if key.is_file() {
-                        Style::default()
-                    } else {
-                        Color::LightCyan.into()
-                    },
-                ))
-            })
-            .collect();
-
-        if !path_holder.is_empty() {
-            self.highlight_index = self.highlight_index % path_holder.len();
-        }
-        if let Some(path) = path_holder.get_mut(self.highlight_index) {
-            *path = path.clone().add_modifier(Modifier::REVERSED);
-        };
-
-        let title = format!("History: {} items", path_holder.len());
-        let messages = List::new(path_holder).block(Block::default().title(title));
-        frame.render_widget(messages, area);
-    }
-
-    fn draw_file_view_search(&mut self, area: Rect, frame: &mut Frame) {
-        let current_file_holder = self
-            .cache_holder
-            .peek(&self.current_directory)
-            .expect(&format!(
-                "Unable to get cache for {:?}",
-                self.current_directory
-            ));
-
-        let mut path_holder: Vec<ListItem> = current_file_holder
-            .child
-            .iter()
-            .filter(|entry| self.should_select(&entry.file_name))
             .map(|entry| {
-                ListItem::new(Line::from(entry.file_name.clone()).style(if entry.is_file {
+                ListItem::new(Line::from(self.get_text(entry)).style(if entry.is_file {
                     Style::default()
                 } else {
                     Color::LightCyan.into()
@@ -225,13 +113,34 @@ impl MessageHolder {
             *path = path.clone().add_modifier(Modifier::REVERSED);
         };
 
-        let title = format!(
-            "{} {}",
-            self.current_directory.display(),
-            current_file_holder.update_time.format("%Y-%m-%d %H:%M:%S")
-        );
+        let title;
+        if self.state_holder.borrow().is_history_search() {
+            title = format!("History: {} items", path_holder.len());
+        } else {
+            title = format!(
+                "{} {}",
+                self.folder_holder.current_directory.display(),
+                self.folder_holder
+                    .peek()
+                    .update_time
+                    .format("%Y-%m-%d %H:%M:%S")
+            );
+        }
+
         let messages = List::new(path_holder).block(Block::default().title(title));
         frame.render_widget(messages, area);
+    }
+
+    fn get_text(&self, entry: &FileHolder) -> String {
+        if self.state_holder.borrow().is_history_search() {
+            entry
+                .to_path()
+                .expect("Unable to get history item")
+                .to_string_lossy()
+                .into_owned()
+        } else {
+            entry.file_name.clone()
+        }
     }
 
     fn draw_file_view(&mut self, area: Rect, frame: &mut Frame, file_path: &PathBuf) {
@@ -260,29 +169,5 @@ impl MessageHolder {
             }),
             &mut self.horizontal_scroll_state,
         );
-    }
-
-    fn should_select(&self, name: &str) -> bool {
-        if self.input.is_empty() {
-            return true;
-        }
-
-        let mut counter = 0;
-        for char in name.chars() {
-            if char.eq_ignore_ascii_case(
-                &self
-                    .input
-                    .chars()
-                    .nth(counter)
-                    .expect("Should not reach out of bounds"),
-            ) {
-                counter += 1;
-            }
-            if counter == self.input.len() {
-                return true;
-            }
-        }
-
-        false
     }
 }

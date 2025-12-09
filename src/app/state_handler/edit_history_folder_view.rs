@@ -25,7 +25,7 @@ impl App {
                         self.message_holder.highlight_index.saturating_add(1);
                 }
                 KeyCode::Enter => {
-                    self.message_holder.submit_for_history();
+                    self.message_holder.submit();
                     self.input.reset();
                     self.state_holder.borrow_mut().to_search();
                 }
