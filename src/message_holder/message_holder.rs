@@ -21,8 +21,7 @@ pub struct MessageHolder {
     state_holder: Rc<RefCell<StateHolder>>,
     folder_holder: FolderHolder,
     code_highlighter: CodeHighlighter,
-
-    pub highlight_index: usize,
+    pub raw_highlight_index: i32,
     pub file_opened: Option<PathBuf>,
     pub file_text_info: Option<FileTextInfo>,
     pub vertical_scroll_state: ScrollbarState,
@@ -38,7 +37,7 @@ impl MessageHolder {
             state_holder,
             code_highlighter: CodeHighlighter::new(),
             folder_holder: FolderHolder::new(state_holder_ref),
-            highlight_index: Default::default(),
+            raw_highlight_index: 0,
             file_opened: Default::default(),
             file_text_info: Default::default(),
             vertical_scroll_state: Default::default(),
@@ -46,6 +45,16 @@ impl MessageHolder {
             vertical_scroll: Default::default(),
             horizontal_scroll: Default::default(),
         }
+    }
+
+    pub fn reset_index(&mut self) {
+        self.raw_highlight_index = 0;
+    }
+    pub fn move_up(&mut self) {
+        self.raw_highlight_index = self.raw_highlight_index.saturating_sub(1);
+    }
+    pub fn move_down(&mut self) {
+        self.raw_highlight_index = self.raw_highlight_index.saturating_add(1);
     }
     pub fn update(&mut self, input: &str) {
         self.folder_holder.update(input);
@@ -59,16 +68,25 @@ impl MessageHolder {
         self.folder_holder.update("");
         self.file_opened = None;
         self.file_text_info = None;
+        self.reset_index();
+    }
+
+    fn get_highlight_index(&self, group_len: usize) -> usize {
+        let divisor: i32 = group_len
+            .try_into()
+            .expect("Cannot convert group len of path_group");
+        let remainder = self.raw_highlight_index.rem_euclid(divisor);
+        remainder.try_into().expect("Unexpected!")
     }
 
     pub fn submit(&mut self) {
         let path_holder = &self.folder_holder.selected_path_holder;
-
-        if !path_holder.is_empty() {
-            self.highlight_index = self.highlight_index % path_holder.len();
+        if path_holder.is_empty() {
+            return;
         }
 
-        let new_entrypoint_canonicalized_result = self.folder_holder.submit(self.highlight_index);
+        let highlight_index = self.get_highlight_index(path_holder.len());
+        let new_entrypoint_canonicalized_result = self.folder_holder.submit(highlight_index);
         match new_entrypoint_canonicalized_result {
             Ok(new_entrypoint) => {
                 if new_entrypoint.is_dir() {
@@ -105,11 +123,12 @@ impl MessageHolder {
                 }))
             })
             .collect();
-
-        if !path_holder.is_empty() {
-            self.highlight_index = self.highlight_index % path_holder.len();
+        if path_holder.is_empty() {
+            return;
         }
-        if let Some(path) = path_holder.get_mut(self.highlight_index) {
+
+        let highlight_index = self.get_highlight_index(path_holder.len());
+        if let Some(path) = path_holder.get_mut(highlight_index) {
             *path = path.clone().add_modifier(Modifier::REVERSED);
         };
 

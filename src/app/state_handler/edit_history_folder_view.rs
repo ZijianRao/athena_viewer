@@ -16,22 +16,17 @@ impl App {
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search(),
-                KeyCode::Up => {
-                    self.message_holder.highlight_index =
-                        self.message_holder.highlight_index.saturating_sub(1);
-                }
-                KeyCode::Down => {
-                    self.message_holder.highlight_index =
-                        self.message_holder.highlight_index.saturating_add(1);
-                }
+                KeyCode::Up => self.message_holder.move_up(),
+                KeyCode::Down => self.message_holder.move_down(),
                 KeyCode::Enter => {
                     self.message_holder.submit();
                     self.input.reset();
                     self.state_holder.borrow_mut().to_search();
                 }
+                KeyCode::Char('c') | KeyCode::Char('z') => self.exit = true,
+
                 _ => {
                     self.input.handle_event(&event);
-                    self.message_holder.highlight_index = 0;
                     self.message_holder.update(self.input.value());
                 }
             }

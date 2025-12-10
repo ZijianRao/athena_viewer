@@ -114,6 +114,7 @@ impl App {
                             .vertical_scroll_state
                             .position(self.message_holder.vertical_scroll);
                     }
+                    KeyCode::Char('c') | KeyCode::Char('z') => self.exit = true,
                     _ => (),
                 }
             }

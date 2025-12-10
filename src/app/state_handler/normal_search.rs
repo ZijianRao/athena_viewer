@@ -21,6 +21,13 @@ impl App {
                     self.message_holder.reset();
                 }
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search_edit(),
+                KeyCode::Up => self.message_holder.move_up(),
+                KeyCode::Down => self.message_holder.move_down(),
+                KeyCode::Enter => {
+                    self.message_holder.submit();
+                    self.input.reset();
+                }
+                KeyCode::Char('c') | KeyCode::Char('z') => self.exit = true,
                 _ => {}
             }
         }
