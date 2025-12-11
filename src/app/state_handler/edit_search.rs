@@ -1,4 +1,4 @@
-use ratatui::crossterm::event::{self, Event, KeyCode};
+use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::{
     layout::Rect,
     style::Stylize,
@@ -11,8 +11,7 @@ use tui_input::backend::crossterm::EventHandler;
 use crate::app::App;
 
 impl App {
-    pub fn handle_edit_search_event(&mut self) {
-        let event = event::read().expect("Unable to handle key press event!");
+    pub fn handle_edit_search_event(&mut self, event: Event) {
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search(),
@@ -22,7 +21,6 @@ impl App {
                     self.message_holder.submit();
                     self.input.reset();
                 }
-                KeyCode::Char('c') | KeyCode::Char('z') => self.exit = true,
                 _ => {
                     self.input.handle_event(&event);
                     self.message_holder.update(self.input.value());

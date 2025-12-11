@@ -1,4 +1,4 @@
-use ratatui::crossterm::event::{self, Event, KeyCode};
+use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::{
     layout::Rect,
     style::Stylize,
@@ -10,11 +10,9 @@ use ratatui::{
 use crate::app::App;
 
 impl App {
-    pub fn handle_normal_search_event(&mut self) {
-        let event = event::read().expect("Unable to handle key press event!");
+    pub fn handle_normal_search_event(&mut self, event: Event) {
         if let Event::Key(key_event) = event {
             match key_event.code {
-                KeyCode::Char('q') => self.exit = true,
                 KeyCode::Char('u') => self.message_holder.refresh_current_folder_cache(),
                 KeyCode::Char('h') => {
                     self.state_holder.borrow_mut().to_history_search();
@@ -27,7 +25,6 @@ impl App {
                     self.message_holder.submit();
                     self.input.reset();
                 }
-                KeyCode::Char('c') | KeyCode::Char('z') => self.exit = true,
                 _ => {}
             }
         }
@@ -39,8 +36,6 @@ impl App {
             "Switch to".into(),
             " FileSearch ".bold(),
             "<Tab>".light_blue().bold(),
-            " Quit ".into(),
-            "<Q>".light_blue().bold(),
             " Update ".into(),
             "<U>".light_blue().bold(),
             " Switch to ".into(),
