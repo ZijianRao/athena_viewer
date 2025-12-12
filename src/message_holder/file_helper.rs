@@ -93,6 +93,8 @@ impl From<PathBuf> for FileGroupHolder {
                 .expect(&format!("Unable to read directory for {:?}", path))
                 .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path()))),
         );
+
+        entries.sort_by_key(|f| f.file_name.clone());
         Self {
             child: entries,
             update_time: Local::now(),

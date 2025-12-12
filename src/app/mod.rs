@@ -17,7 +17,7 @@ use crate::state_holder::state_holder::{InputMode, StateHolder, ViewMode};
 
 const MIN_INPUT_WIDTH: u16 = 3;
 const INPUT_WIDTH_PADDING: u16 = 3;
-const TICK_RATE: Duration = Duration::from_millis(200);
+const TICK_RATE: Duration = Duration::from_millis(50);
 
 #[derive(Debug)]
 pub struct App {

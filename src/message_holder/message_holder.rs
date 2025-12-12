@@ -58,6 +58,7 @@ impl MessageHolder {
     }
     pub fn update(&mut self, input: &str) {
         self.folder_holder.update(input);
+        self.reset_index();
     }
 
     pub fn refresh_current_folder_cache(&mut self) {
@@ -115,12 +116,14 @@ impl MessageHolder {
             .folder_holder
             .selected_path_holder
             .iter()
-            .map(|entry| {
-                ListItem::new(Line::from(self.get_text(entry)).style(if entry.is_file {
-                    Style::default()
-                } else {
-                    Color::LightCyan.into()
-                }))
+            .filter_map(|entry| {
+                self.get_text(entry).ok().map(|text| {
+                    ListItem::new(Line::from(text).style(if entry.is_file {
+                        Style::default()
+                    } else {
+                        Color::LightCyan.into()
+                    }))
+                })
             })
             .collect();
         if path_holder.is_empty() {
@@ -150,15 +153,11 @@ impl MessageHolder {
         frame.render_widget(messages, area);
     }
 
-    fn get_text(&self, entry: &FileHolder) -> String {
+    fn get_text(&self, entry: &FileHolder) -> Result<String, std::io::Error> {
         if self.state_holder.borrow().is_history_search() {
-            entry
-                .to_path()
-                .expect("Unable to get history item")
-                .to_string_lossy()
-                .into_owned()
+            Ok(entry.to_path()?.to_string_lossy().into_owned())
         } else {
-            entry.file_name.clone()
+            Ok(entry.file_name.clone())
         }
     }
 
