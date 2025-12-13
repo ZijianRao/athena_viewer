@@ -3,8 +3,8 @@ use ViewMode::*;
 
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum InputMode {
-    #[default]
     Normal,
+    #[default]
     Edit,
 }
 

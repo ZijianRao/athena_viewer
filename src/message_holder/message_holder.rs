@@ -60,6 +60,9 @@ impl MessageHolder {
         self.folder_holder.update(input);
         self.reset_index();
     }
+    pub fn expand(&mut self) {
+        self.folder_holder.expand();
+    }
 
     pub fn refresh_current_folder_cache(&mut self) {
         self.folder_holder.refresh();
@@ -157,7 +160,7 @@ impl MessageHolder {
         if self.state_holder.borrow().is_history_search() {
             Ok(entry.to_path()?.to_string_lossy().into_owned())
         } else {
-            Ok(entry.file_name.clone())
+            Ok(entry.relative_to(&self.folder_holder.current_directory))
         }
     }
 

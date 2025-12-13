@@ -73,19 +73,35 @@ impl FileHolder {
     pub fn to_path(&self) -> Result<PathBuf, std::io::Error> {
         self.parent.join(self.file_name.clone()).canonicalize()
     }
+
+    pub fn relative_to(&self, ref_path: &PathBuf) -> String {
+        let rel_path = self.parent.strip_prefix(ref_path).expect(&format!(
+            "Can not get path prefix from {} for {}",
+            self.parent.to_string_lossy(),
+            ref_path.to_string_lossy()
+        ));
+        let prefix = rel_path.to_string_lossy();
+        if prefix.is_empty() {
+            self.file_name.clone()
+        } else {
+            format!("{}/{}", prefix, self.file_name)
+        }
+    }
 }
 
-impl From<PathBuf> for FileGroupHolder {
-    fn from(path: PathBuf) -> Self {
+impl FileGroupHolder {
+    pub fn new(path: PathBuf, adding_parent_shortcut: bool) -> Self {
         let mut entries = Vec::new();
 
         // add if not at root
-        if let Some(_parent) = path.parent() {
-            entries.push(FileHolder {
-                parent: path.clone(),
-                file_name: "..".to_string(),
-                is_file: false,
-            })
+        if adding_parent_shortcut {
+            if let Some(_parent) = path.parent() {
+                entries.push(FileHolder {
+                    parent: path.clone(),
+                    file_name: "..".to_string(),
+                    is_file: false,
+                })
+            }
         }
 
         entries.extend(

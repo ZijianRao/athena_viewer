@@ -18,6 +18,7 @@ impl App {
                     self.state_holder.borrow_mut().to_history_search();
                     self.message_holder.reset();
                 }
+                KeyCode::Char('e') => self.message_holder.expand(),
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search_edit(),
                 KeyCode::Up => self.message_holder.move_up(),
                 KeyCode::Down => self.message_holder.move_down(),
@@ -38,6 +39,8 @@ impl App {
             "<Tab>".light_blue().bold(),
             " Update ".into(),
             "<U>".light_blue().bold(),
+            " Expand ".into(),
+            "<E>".light_blue().bold(),
             " Switch to ".into(),
             "FileSearchHistory ".bold(),
             "<H>".light_blue().bold(),

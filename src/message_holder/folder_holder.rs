@@ -21,13 +21,14 @@ pub struct FolderHolder {
     input: String,
     pub selected_path_holder: Vec<FileHolder>,
     pub current_directory: PathBuf,
+    current_holder: Vec<FileHolder>,
 }
 
 impl FolderHolder {
     pub fn new(state_holder: Rc<RefCell<StateHolder>>) -> Self {
         let current_directory = env::current_dir().expect("Unable to get current directory!");
-        let holder = FileGroupHolder::from(current_directory.clone());
-        let selected_path_holder: Vec<FileHolder> = holder.child.clone().into_iter().collect();
+        let holder = FileGroupHolder::new(current_directory.clone(), true);
+        let current_holder: Vec<FileHolder> = holder.child.clone().into_iter().collect();
         let mut cache_holder = LruCache::new(DEFAULT_CACHE_SIZE);
         cache_holder.put(current_directory.clone(), holder);
 
@@ -36,18 +37,43 @@ impl FolderHolder {
             cache_holder: cache_holder,
             current_directory: current_directory,
             input: Default::default(),
-            selected_path_holder: selected_path_holder,
+            selected_path_holder: current_holder.clone(),
+            current_holder: current_holder,
         }
     }
 
+    pub fn expand(&mut self) {
+        let first_item = self.current_holder[0].clone();
+        let value_path_group: Vec<PathBuf> = self
+            .current_holder
+            .iter()
+            .skip(1) // ignore ".." case
+            .filter_map(|p| p.to_path().ok())
+            .collect();
+
+        let mut result: Vec<FileHolder> = value_path_group
+            .iter()
+            .flat_map(|p| {
+                if p.is_dir() {
+                    FileGroupHolder::new(p.clone(), false).child
+                } else {
+                    vec![FileHolder::from(p.clone())]
+                }
+            })
+            .collect();
+        result.insert(0, first_item);
+        self.current_holder = result;
+        self.update(&self.input.clone());
+    }
+
     pub fn put(&mut self, path: &PathBuf) {
-        let holder = FileGroupHolder::from(path.clone());
+        let holder = FileGroupHolder::new(path.clone(), true);
         self.cache_holder.put(path.clone(), holder);
     }
 
     pub fn update(&mut self, input: &str) {
         self.input = input.to_string();
-        let messages: Vec<FileHolder>;
+
         if self.state_holder.borrow().is_history_search() {
             self.selected_path_holder = self
                 .cache_holder
@@ -61,18 +87,11 @@ impl FolderHolder {
                 .map(|(path, _)| FileHolder::from(path.clone()))
                 .collect();
         } else {
-            messages = self
-                .cache_holder
-                .get(&self.current_directory)
-                .expect(&format!(
-                    "Unable to get folder cache for {:?}",
-                    self.current_directory
-                ))
-                .child
-                .clone();
-            self.selected_path_holder = messages
+            self.selected_path_holder = self
+                .current_holder
+                .clone()
                 .into_iter()
-                .filter(|entry| self.should_select(&entry.file_name))
+                .filter(|entry| self.should_select(&entry.relative_to(&self.current_directory)))
                 .collect();
         }
     }
@@ -83,12 +102,21 @@ impl FolderHolder {
         }
 
         self.current_directory = path;
+        self.current_holder = self
+            .cache_holder
+            .get(&self.current_directory)
+            .expect(&format!(
+                "Unable to get folder cache for {:?}",
+                self.current_directory
+            ))
+            .child
+            .clone();
         self.input.clear();
         self.update("");
     }
 
     pub fn refresh(&mut self) {
-        let holder = FileGroupHolder::from(self.current_directory.clone());
+        let holder = FileGroupHolder::new(self.current_directory.clone(), true);
         self.cache_holder
             .put(self.current_directory.clone(), holder);
         self.update(&self.input.clone());
