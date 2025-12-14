@@ -2,6 +2,7 @@ use std::env;
 
 use lru::LruCache;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -22,6 +23,7 @@ pub struct FolderHolder {
     pub selected_path_holder: Vec<FileHolder>,
     pub current_directory: PathBuf,
     current_holder: Vec<FileHolder>,
+    expand_level: usize,
 }
 
 impl FolderHolder {
@@ -39,6 +41,7 @@ impl FolderHolder {
             input: Default::default(),
             selected_path_holder: current_holder.clone(),
             current_holder: current_holder,
+            expand_level: 0,
         }
     }
 
@@ -63,6 +66,45 @@ impl FolderHolder {
             .collect();
         result.insert(0, first_item);
         self.current_holder = result;
+        self.update(&self.input.clone());
+        self.expand_level = self.expand_level.saturating_add(1);
+    }
+
+    pub fn collapse(&mut self) {
+        if self.expand_level == 0 {
+            return;
+        }
+        self.expand_level = self.expand_level.saturating_sub(1);
+
+        let first_item = self.current_holder[0].clone();
+        let mut new_current_holder: Vec<FileHolder> = Vec::new();
+        new_current_holder.push(first_item);
+        let mut selected_path_ref: HashSet<PathBuf> = HashSet::new();
+
+        for item in self.current_holder.iter().skip(1) {
+            let result = item.relative_to(&self.current_directory);
+            let current_level = result.matches('/').count();
+
+            let key;
+            if current_level > self.expand_level {
+                key = item
+                    .parent
+                    .canonicalize()
+                    .expect("Cannot canonicalize?")
+                    .clone();
+            } else {
+                key = item
+                    .to_path()
+                    .expect("Expect to have valid path")
+                    .canonicalize()
+                    .expect("Cannot canonicalize?")
+            }
+            if !selected_path_ref.contains(&key) {
+                new_current_holder.push(FileHolder::from(key.clone()));
+                selected_path_ref.insert(key);
+            }
+        }
+        self.current_holder = new_current_holder;
         self.update(&self.input.clone());
     }
 
@@ -113,6 +155,7 @@ impl FolderHolder {
             .clone();
         self.input.clear();
         self.update("");
+        self.expand_level = 0;
     }
 
     pub fn refresh(&mut self) {

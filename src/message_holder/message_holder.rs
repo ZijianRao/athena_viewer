@@ -63,6 +63,9 @@ impl MessageHolder {
     pub fn expand(&mut self) {
         self.folder_holder.expand();
     }
+    pub fn collapse(&mut self) {
+        self.folder_holder.collapse();
+    }
 
     pub fn refresh_current_folder_cache(&mut self) {
         self.folder_holder.refresh();
