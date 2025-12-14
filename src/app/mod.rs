@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use std::io::{self};
 use std::rc::Rc;
 use std::time::Duration;
+use std::time::Instant;
 use tui_input::Input;
 
 use crate::message_holder::message_holder::MessageHolder;
@@ -25,6 +26,8 @@ pub struct App {
     input: Input,
     exit: bool,
     message_holder: MessageHolder,
+    timer: Instant,
+    duration: Duration,
 }
 
 pub mod state_handler;
@@ -37,6 +40,8 @@ impl App {
             input: Input::default(),
             exit: false,
             message_holder: MessageHolder::new(Rc::clone(&state_holder)),
+            timer: Instant::now(),
+            duration: Duration::default(),
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -52,14 +57,16 @@ impl App {
         use InputMode::*;
         use ViewMode::*;
         let vertical = Layout::vertical([
+            Constraint::Length(1),
             Constraint::Min(1),
             Constraint::Length(3),
             Constraint::Length(1),
         ]);
 
-        let [messages_area, input_area, help_area] = vertical.areas(frame.area());
+        let [log_area, messages_area, input_area, help_area] = vertical.areas(frame.area());
         let input_mode = self.state_holder.borrow().input_mode;
         let view_mode = self.state_holder.borrow().view_mode;
+
         match (input_mode, view_mode) {
             (Normal, Search) => self.draw_help_normal_search(help_area, frame),
             (Normal, FileView) => self.draw_help_normal_file_view(help_area, frame),
@@ -69,6 +76,7 @@ impl App {
         }
         self.draw_input_area(input_area, frame);
         self.message_holder.draw(messages_area, frame);
+        self.draw_log_area(log_area, frame);
     }
 
     pub fn draw_input_area(&self, area: Rect, frame: &mut Frame) {
@@ -96,13 +104,28 @@ impl App {
         }
     }
 
+    pub fn draw_log_area(&self, area: Rect, frame: &mut Frame) {
+        let log = Paragraph::new(format!("Took {:.2?}", self.duration));
+        frame.render_widget(log, area);
+    }
+
+    pub fn mark_time(&mut self) {
+        self.timer = Instant::now()
+    }
+    pub fn since_mark(&mut self) {
+        self.duration = self.timer.elapsed()
+    }
+
     pub fn handle_event(&mut self) {
         use InputMode::*;
         use ViewMode::*;
         if event::poll(TICK_RATE).expect("Unable handle the timeout applied!") {
             let event = event::read().expect("Unable to handle key press event!");
+            let mut is_key_press_event = false;
 
             if let Event::Key(key_event) = &event {
+                self.mark_time();
+                is_key_press_event = true;
                 match &key_event.code {
                     &KeyCode::Char('c') | &KeyCode::Char('z') => {
                         if key_event.modifiers.contains(KeyModifiers::CONTROL) {
@@ -124,6 +147,10 @@ impl App {
                 (Edit, HistoryFolderView) => self.handle_edit_history_folder_view_event(event),
                 (Edit, Search) => self.handle_edit_search_event(event),
                 _ => (),
+            }
+
+            if is_key_press_event {
+                self.since_mark();
             }
         }
     }
