@@ -160,9 +160,11 @@ impl FolderHolder {
 
     pub fn refresh(&mut self) {
         let holder = FileGroupHolder::new(self.current_directory.clone(), true);
+        self.current_holder = holder.child.clone();
+        self.update(&self.input.clone());
+
         self.cache_holder
             .put(self.current_directory.clone(), holder);
-        self.update(&self.input.clone());
     }
 
     fn should_select(&self, name: &str) -> bool {
