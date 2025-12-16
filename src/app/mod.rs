@@ -127,7 +127,7 @@ impl App {
                 self.mark_time();
                 is_key_press_event = true;
                 match &key_event.code {
-                    &KeyCode::Char('c') | &KeyCode::Char('z') => {
+                    &KeyCode::Char('z') => {
                         if key_event.modifiers.contains(KeyModifiers::CONTROL) {
                             self.exit = true;
                         }

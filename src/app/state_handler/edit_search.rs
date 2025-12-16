@@ -1,4 +1,4 @@
-use ratatui::crossterm::event::{Event, KeyCode};
+use ratatui::crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
     layout::Rect,
     style::Stylize,
@@ -22,8 +22,15 @@ impl App {
                     self.input.reset();
                 }
                 _ => {
-                    self.input.handle_event(&event);
-                    self.message_holder.update(self.input.value());
+                    if (key_event.code == KeyCode::Char('c'))
+                        & key_event.modifiers.contains(KeyModifiers::CONTROL)
+                    {
+                        self.input.reset();
+                        self.message_holder.update("");
+                    } else {
+                        self.input.handle_event(&event);
+                        self.message_holder.update(self.input.value());
+                    }
                 }
             }
         }
@@ -34,6 +41,8 @@ impl App {
             "Switch to".into(),
             " Normal ".bold(),
             "<Tab>".light_blue().bold(),
+            " Clear ".bold(),
+            "<CTRL+C>".light_blue().bold(),
         ]));
 
         let help_message = Paragraph::new(instructions);
