@@ -1,4 +1,4 @@
-use ratatui::crossterm::event::{Event, KeyCode};
+use ratatui::crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
     layout::Rect,
     style::Stylize,
@@ -21,12 +21,24 @@ impl App {
                 KeyCode::Char('e') => self.message_holder.expand(),
                 KeyCode::Char('c') => self.message_holder.collapse(),
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search_edit(),
-                KeyCode::Up => self.message_holder.move_up(),
-                KeyCode::Down => self.message_holder.move_down(),
+                KeyCode::Char('k') | KeyCode::Up => {
+                    if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                        self.message_holder.to_parent();
+                    } else {
+                        self.message_holder.move_up();
+                    }
+                }
+                KeyCode::Char('j') | KeyCode::Down => self.message_holder.move_down(),
                 KeyCode::Enter => {
                     self.message_holder.submit();
                     self.input.reset();
                 }
+                KeyCode::Char('d') => {
+                    if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                        self.message_holder.delete();
+                    }
+                }
+
                 _ => {}
             }
         }
@@ -44,6 +56,10 @@ impl App {
             "<E>".light_blue().bold(),
             " Collapse ".into(),
             "<C>".light_blue().bold(),
+            " Delete ".into(),
+            "<CTRL+D>".light_blue().bold(),
+            " To Parent ".into(),
+            "<CTRL+K>".light_blue().bold(),
             " Switch to ".into(),
             "FileSearchHistory ".bold(),
             "<H>".light_blue().bold(),

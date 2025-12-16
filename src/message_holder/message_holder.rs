@@ -7,6 +7,8 @@ use ratatui::{
     widgets::{Block, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame,
 };
+use std::fs;
+
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -65,6 +67,29 @@ impl MessageHolder {
     }
     pub fn collapse(&mut self) {
         self.folder_holder.collapse();
+    }
+
+    pub fn to_parent(&mut self) {
+        self.raw_highlight_index = 0;
+        self.update("");
+        self.submit();
+    }
+
+    pub fn delete(&mut self) {
+        let path_holder = &self.folder_holder.selected_path_holder;
+        if path_holder.is_empty() {
+            return;
+        }
+
+        let highlight_index = self.get_highlight_index(path_holder.len());
+        if let Ok(path) = self.folder_holder.submit(highlight_index) {
+            if path.is_dir() {
+                let _ = fs::remove_dir_all(path);
+            } else {
+                let _ = fs::remove_file(path);
+            }
+            self.folder_holder.refresh();
+        }
     }
 
     pub fn refresh_current_folder_cache(&mut self) {
@@ -141,21 +166,22 @@ impl MessageHolder {
             *path = path.clone().add_modifier(Modifier::REVERSED);
         };
 
-        let title;
+        let block;
         if self.state_holder.borrow().is_history_search() {
-            title = format!("History: {} items", path_holder.len());
+            block = Block::default().title(format!("History: {} items", path_holder.len()));
         } else {
-            title = format!(
-                "{} {}",
-                self.folder_holder.current_directory.display(),
-                self.folder_holder
-                    .peek()
-                    .update_time
-                    .format("%Y-%m-%d %H:%M:%S")
-            );
+            block = Block::default()
+                .title(self.folder_holder.current_directory.display().to_string())
+                .title_bottom(
+                    self.folder_holder
+                        .peek()
+                        .update_time
+                        .format("%Y-%m-%d %H:%M:%S")
+                        .to_string(),
+                )
         }
 
-        let messages = List::new(path_holder).block(Block::default().title(title));
+        let messages = List::new(path_holder).block(block);
         frame.render_widget(messages, area);
     }
 
