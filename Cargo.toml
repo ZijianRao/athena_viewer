@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-crossterm = "0.29.0"
-ratatui = "0.29.0"
-tui-input = "0.14.0"
+crossterm = "0.29"
+ratatui = "0.29"
+tui-input = "0.14"
 chrono = { version = "0.4", features = ["serde"] }
-lru = "0.16.2"
-syntect = "5.3.0"
+lru = "0.16"
+syntect = "5.3"
