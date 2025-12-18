@@ -18,9 +18,9 @@ impl App {
                 KeyCode::Up => self.message_holder.move_up(),
                 KeyCode::Down => self.message_holder.move_down(),
                 KeyCode::Enter => {
+                    self.state_holder.borrow_mut().to_search();
                     self.message_holder.submit();
                     self.input.reset();
-                    self.state_holder.borrow_mut().to_search();
                 }
 
                 _ => {
