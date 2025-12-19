@@ -117,3 +117,36 @@ impl FileGroupHolder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_file_holder() -> Result<(), Box<dyn std::error::Error>> {
+        let path = get_temp_file()?;
+        let _ = FileHolder::from(path);
+        Ok(())
+    }
+
+    #[test]
+    fn test_file_text_info() -> Result<(), Box<dyn std::error::Error>> {
+        let path = get_temp_file()?;
+        let code_highlighter = CodeHighlighter::new();
+        let file_text_info = FileTextInfo::new(&path, &code_highlighter);
+        assert_eq!(file_text_info.n_rows, 1);
+        assert_eq!(file_text_info.max_line_length, 17);
+        Ok(())
+    }
+
+    fn get_temp_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let temp_file = NamedTempFile::new()?;
+
+        let mut file = temp_file.reopen()?;
+        file.write_all(b"Hello, world!")?;
+
+        Ok(temp_file.path().to_path_buf())
+    }
+}

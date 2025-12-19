@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use syntect::{
     easy::HighlightLines,
     highlighting::{Theme, ThemeSet},
-    parsing::SyntaxSet,
+    parsing::{SyntaxReference, SyntaxSet},
     util::LinesWithEndings,
 };
 
@@ -22,13 +22,15 @@ impl CodeHighlighter {
         Self { syntax_set, theme }
     }
 
-    pub fn highlight(&self, code: &str, file_path: &PathBuf) -> Vec<Line<'static>> {
-        let syntax = file_path
+    fn get_syntax(&self, file_path: &PathBuf) -> &SyntaxReference {
+        file_path
             .extension()
             .and_then(|ext| ext.to_str())
             .and_then(|ext_str| self.syntax_set.find_syntax_by_extension(ext_str))
-            .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+            .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+    }
 
+    fn get_highlighted_code(&self, code: &str, syntax: &SyntaxReference) -> Vec<Line<'static>> {
         let mut highlighter = HighlightLines::new(syntax, &self.theme);
         let mut lines = Vec::new();
 
@@ -51,7 +53,27 @@ impl CodeHighlighter {
                 .collect::<Vec<_>>();
             lines.push(Line::from(spans));
         }
-
         lines
+    }
+
+    pub fn highlight(&self, code: &str, file_path: &PathBuf) -> Vec<Line<'static>> {
+        let syntax = self.get_syntax(file_path);
+        self.get_highlighted_code(code, syntax)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_highlight_plain_test() {
+        let highlighter = CodeHighlighter::new();
+        let syntax = highlighter.syntax_set.find_syntax_plain_text();
+
+        let code = "abc \n cde";
+
+        let out = highlighter.get_highlighted_code(code, syntax);
+        assert_eq!(out.len(), 2)
     }
 }
