@@ -22,12 +22,12 @@ const TICK_RATE: Duration = Duration::from_millis(100);
 
 #[derive(Debug)]
 pub struct App {
-    state_holder: Rc<RefCell<StateHolder>>,
-    input: Input,
-    exit: bool,
-    message_holder: MessageHolder,
-    timer: Instant,
-    duration: Duration,
+    pub state_holder: Rc<RefCell<StateHolder>>,
+    pub input: Input,
+    pub exit: bool,
+    pub message_holder: MessageHolder,
+    pub timer: Instant,
+    pub duration: Duration,
 }
 
 pub mod state_handler;

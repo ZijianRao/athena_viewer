@@ -36,6 +36,7 @@ impl TestFileSystem {
         // root files
         self.create_file("README.md", "# Test Project\nThis is a readme.");
         self.create_file("main.rs", "fn main() { println!(\"hello\"); }");
+        self.create_file(".gitkeep", "");
 
         // nested directories
         self.create_dir("src");

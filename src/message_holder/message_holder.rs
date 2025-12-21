@@ -21,7 +21,7 @@ use crate::state_holder::state_holder::StateHolder;
 #[derive(Debug)]
 pub struct MessageHolder {
     state_holder: Rc<RefCell<StateHolder>>,
-    folder_holder: FolderHolder,
+    pub folder_holder: FolderHolder,
     code_highlighter: CodeHighlighter,
     pub raw_highlight_index: i32,
     pub file_opened: Option<PathBuf>,
