@@ -33,12 +33,12 @@ pub struct MessageHolder {
 }
 
 impl MessageHolder {
-    pub fn new(state_holder: Rc<RefCell<StateHolder>>) -> Self {
+    pub fn new(current_directory: PathBuf, state_holder: Rc<RefCell<StateHolder>>) -> Self {
         let state_holder_ref = Rc::clone(&state_holder);
         MessageHolder {
             state_holder,
             code_highlighter: CodeHighlighter::new(),
-            folder_holder: FolderHolder::new(state_holder_ref),
+            folder_holder: FolderHolder::new(current_directory, state_holder_ref),
             raw_highlight_index: 0,
             file_opened: Default::default(),
             file_text_info: Default::default(),

@@ -14,10 +14,9 @@ impl TestApp {
     /// create a new test app starting in a specific directory
     pub fn new(start_dir: PathBuf) -> Self {
         // change to test directory
-        std::env::set_current_dir(&start_dir).unwrap();
 
         let terminal = super::mock_terminal::create_test_terminal();
-        let app = App::new();
+        let app = App::new(start_dir);
 
         Self { app, terminal }
     }
@@ -101,13 +100,18 @@ impl TestApp {
 
     /// get list of visible files/folders (for assertions)
     pub fn get_visible_items(&self) -> Vec<String> {
+        let is_history_view = self.is_history_view();
         self.app
             .message_holder
             .folder_holder
             .selected_path_holder
             .iter()
             .map(|entry| {
-                entry.relative_to(&self.app.message_holder.folder_holder.current_directory)
+                if is_history_view {
+                    entry.to_path().unwrap().to_string_lossy().into_owned()
+                } else {
+                    entry.relative_to(&self.app.message_holder.folder_holder.current_directory)
+                }
             })
             .collect()
     }

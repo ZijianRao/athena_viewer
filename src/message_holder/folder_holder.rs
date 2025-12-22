@@ -1,5 +1,3 @@
-use std::env;
-
 use lru::LruCache;
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -27,8 +25,7 @@ pub struct FolderHolder {
 }
 
 impl FolderHolder {
-    pub fn new(state_holder: Rc<RefCell<StateHolder>>) -> Self {
-        let current_directory = env::current_dir().expect("Unable to get current directory!");
+    pub fn new(current_directory: PathBuf, state_holder: Rc<RefCell<StateHolder>>) -> Self {
         let holder = FileGroupHolder::new(current_directory.clone(), true);
         let current_holder: Vec<FileHolder> = holder.child.clone().into_iter().collect();
         let mut cache_holder = LruCache::new(DEFAULT_CACHE_SIZE);

@@ -8,6 +8,7 @@ use ratatui::{
 };
 use std::cell::RefCell;
 use std::io::{self};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 use std::time::Instant;
@@ -32,14 +33,14 @@ pub struct App {
 
 pub mod state_handler;
 impl App {
-    pub fn new() -> Self {
+    pub fn new(current_directory: PathBuf) -> Self {
         let state_holder = Rc::new(RefCell::new(StateHolder::default()));
 
         App {
             state_holder: Rc::clone(&state_holder),
             input: Input::default(),
             exit: false,
-            message_holder: MessageHolder::new(Rc::clone(&state_holder)),
+            message_holder: MessageHolder::new(current_directory, Rc::clone(&state_holder)),
             timer: Instant::now(),
             duration: Duration::default(),
         }
