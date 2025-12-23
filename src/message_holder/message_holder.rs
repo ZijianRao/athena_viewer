@@ -98,9 +98,13 @@ impl MessageHolder {
 
     pub fn reset(&mut self) {
         self.folder_holder.update("");
+        self.reset_file_view();
+        self.reset_index();
+    }
+
+    pub fn reset_file_view(&mut self) {
         self.file_opened = None;
         self.file_text_info = None;
-        self.reset_index();
     }
 
     fn get_highlight_index(&self, group_len: usize) -> usize {
@@ -131,7 +135,7 @@ impl MessageHolder {
                     self.state_holder.borrow_mut().to_file_view();
                 }
             }
-            Err(_) => {}
+            Err(_) => self.refresh_current_folder_cache(),
         }
     }
 

@@ -39,12 +39,25 @@ mod navigation_tests {
         visible_items.sort();
         assert_eq!(app.get_visible_items(), visible_items); // lib.rs, module.rs, nested/
 
-        app.send_event(events::down());
-        app.send_event(events::enter());
+        app.send_events(vec![
+            events::char('l'),
+            events::char('i'),
+            events::char('b'),
+            events::char('.'),
+            events::char('r'),
+            events::char('s'),
+            events::enter(),
+        ]);
+        // check filter is effective
+        assert_eq!(app.get_visible_items(), vec!["lib.rs"]);
         // file view mode with lib.rs
         assert!(app.is_file_view());
         assert!(app.get_opened_file().is_some());
         assert!(app.get_opened_file().unwrap().ends_with("lib.rs"));
+
+        app.send_event(events::char('q'));
+        // check filter is still effective
+        assert_eq!(app.get_visible_items(), vec!["lib.rs"]);
     }
 
     #[test]

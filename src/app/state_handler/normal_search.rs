@@ -31,7 +31,9 @@ impl App {
                 KeyCode::Char('j') | KeyCode::Down => self.message_holder.move_down(),
                 KeyCode::Enter => {
                     self.message_holder.submit();
-                    self.input.reset();
+                    if !self.state_holder.borrow().is_file_view() {
+                        self.input.reset();
+                    }
                 }
                 KeyCode::Char('d') => {
                     if key_event.modifiers.contains(KeyModifiers::CONTROL) {

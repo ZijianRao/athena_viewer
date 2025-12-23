@@ -20,7 +20,9 @@ impl App {
                 KeyCode::Enter => {
                     self.state_holder.borrow_mut().to_search();
                     self.message_holder.submit();
-                    self.input.reset();
+                    if !self.state_holder.borrow().is_file_view() {
+                        self.input.reset();
+                    }
                 }
 
                 _ => {

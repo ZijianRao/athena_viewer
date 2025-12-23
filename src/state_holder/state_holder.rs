@@ -54,6 +54,10 @@ impl StateHolder {
         self.view_mode == HistoryFolderView
     }
 
+    pub fn is_file_view(&self) -> bool {
+        self.view_mode == FileView
+    }
+
     fn save_previous_state(&mut self) {
         self.prev_input_mode = self.input_mode.clone();
         self.prev_view_mode = self.view_mode.clone();

@@ -14,7 +14,7 @@ impl App {
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Char('q') => {
-                    self.message_holder.reset();
+                    self.message_holder.reset_file_view();
                     self.state_holder.borrow_mut().restore_previous_state();
                 }
                 KeyCode::Char('j') | KeyCode::Down => {
