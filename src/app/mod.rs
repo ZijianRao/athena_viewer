@@ -14,8 +14,8 @@ use std::time::Duration;
 use std::time::Instant;
 use tui_input::Input;
 
-use crate::message_holder::message_holder::MessageHolder;
-use crate::state_holder::state_holder::{InputMode, StateHolder, ViewMode};
+use crate::message_holder::MessageHolder;
+use crate::state_holder::{InputMode, StateHolder, ViewMode};
 
 const MIN_INPUT_WIDTH: u16 = 3;
 const INPUT_WIDTH_PADDING: u16 = 3;
@@ -85,12 +85,11 @@ impl App {
         let width = area.width.max(MIN_INPUT_WIDTH) - INPUT_WIDTH_PADDING;
         let scroll = self.input.visual_scroll(width as usize);
 
-        let style;
-        if self.state_holder.borrow().is_edit() {
-            style = Color::Yellow.into();
+        let style = if self.state_holder.borrow().is_edit() {
+            Color::Yellow.into()
         } else {
-            style = Style::default();
-        }
+            Style::default()
+        };
 
         let input = Paragraph::new(self.input.value())
             .style(style)
@@ -127,15 +126,12 @@ impl App {
             if let Event::Key(key_event) = &event {
                 self.mark_time();
                 is_key_press_event = true;
-                match &key_event.code {
-                    &KeyCode::Char('z') => {
-                        if key_event.modifiers.contains(KeyModifiers::CONTROL) {
-                            self.exit = true;
-                        }
+                if let &KeyCode::Char('z') = &key_event.code {
+                    if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                        self.exit = true;
                     }
-                    _ => (),
-                }
-            }
+                };
+            };
             if self.exit {
                 return;
             }

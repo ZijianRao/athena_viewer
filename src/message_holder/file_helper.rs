@@ -33,11 +33,11 @@ impl FileTextInfo {
             Err(_) => "Unable to read...".to_string(),
         };
 
-        let (num_rows, max_line_length) = Self::get_string_dimensions(&content);
+        let (n_rows, max_line_length) = Self::get_string_dimensions(&content);
 
         Self {
-            n_rows: num_rows,
-            max_line_length: max_line_length,
+            n_rows,
+            max_line_length,
             formatted_text: code_highlighter.highlight(&content, value),
         }
     }
@@ -55,7 +55,7 @@ impl From<PathBuf> for FileHolder {
         let file_name = path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
-            .expect(&format!("Unable to get file name for {:?}", path));
+            .unwrap_or_else(|| panic!("Unable to get file name for {:?}", path));
 
         let is_file = path.is_file();
         FileHolder {
@@ -63,8 +63,8 @@ impl From<PathBuf> for FileHolder {
                 .parent()
                 .expect("Must have a valid parent folder")
                 .to_path_buf(),
-            file_name: file_name,
-            is_file: is_file,
+            file_name,
+            is_file,
         }
     }
 }
@@ -79,11 +79,9 @@ impl FileHolder {
     }
 
     pub fn relative_to(&self, ref_path: &PathBuf) -> String {
-        let rel_path = self.parent.strip_prefix(ref_path).expect(&format!(
-            "Can not get path prefix from {} for {}",
+        let rel_path = self.parent.strip_prefix(ref_path).unwrap_or_else(|_| panic!("Can not get path prefix from {} for {}",
             self.parent.to_string_lossy(),
-            ref_path.to_string_lossy()
-        ));
+            ref_path.to_string_lossy()));
         let prefix = rel_path.to_string_lossy();
         if prefix.is_empty() {
             self.file_name.clone()
@@ -110,7 +108,7 @@ impl FileGroupHolder {
 
         entries.extend(
             fs::read_dir(&path)
-                .expect(&format!("Unable to read directory for {:?}", path))
+                .unwrap_or_else(|_| panic!("Unable to read directory for {:?}", path))
                 .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path()))),
         );
 
@@ -138,7 +136,7 @@ mod tests {
     #[test]
     fn test_file_text_info() -> Result<(), Box<dyn std::error::Error>> {
         let path = get_temp_file()?;
-        let code_highlighter = CodeHighlighter::new();
+        let code_highlighter = CodeHighlighter::default();
         let file_text_info = FileTextInfo::new(&path, &code_highlighter);
         assert_eq!(file_text_info.n_rows, 1);
         assert_eq!(file_text_info.max_line_length, 17);

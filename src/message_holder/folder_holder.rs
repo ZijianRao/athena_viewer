@@ -2,11 +2,11 @@ use lru::LruCache;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use crate::message_holder::file_helper::{FileGroupHolder, FileHolder};
-use crate::state_holder::state_holder::StateHolder;
+use crate::state_holder::StateHolder;
 
 const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(100) {
     Some(size) => size,
@@ -32,12 +32,12 @@ impl FolderHolder {
         cache_holder.put(current_directory.clone(), holder);
 
         FolderHolder {
-            state_holder: state_holder,
-            cache_holder: cache_holder,
-            current_directory: current_directory,
+            state_holder,
+            cache_holder,
+            current_directory,
             input: Default::default(),
             selected_path_holder: current_holder.clone(),
-            current_holder: current_holder,
+            current_holder,
             expand_level: 0,
         }
     }
@@ -82,20 +82,18 @@ impl FolderHolder {
             let result = item.relative_to(&self.current_directory);
             let current_level = result.matches('/').count();
 
-            let key;
-            if current_level > self.expand_level {
-                key = item
-                    .parent
+            let key = if current_level > self.expand_level {
+                item.parent
                     .canonicalize()
                     .expect("Cannot canonicalize?")
-                    .clone();
+                    .clone()
             } else {
-                key = item
-                    .to_path_canonicalize()
+                item.to_path_canonicalize()
                     .expect("Expect to have valid path")
                     .canonicalize()
                     .expect("Cannot canonicalize?")
-            }
+            };
+
             if !selected_path_ref.contains(&key) {
                 new_current_holder.push(FileHolder::from(key.clone()));
                 selected_path_ref.insert(key);
@@ -105,9 +103,9 @@ impl FolderHolder {
         self.update(&self.input.clone());
     }
 
-    pub fn put(&mut self, path: &PathBuf) {
-        let holder = FileGroupHolder::new(path.clone(), true);
-        self.cache_holder.put(path.clone(), holder);
+    pub fn put(&mut self, path: &Path) {
+        let holder = FileGroupHolder::new(path.to_path_buf(), true);
+        self.cache_holder.put(path.to_path_buf(), holder);
     }
 
     pub fn update(&mut self, input: &str) {
@@ -120,7 +118,7 @@ impl FolderHolder {
                 .filter(|(path, _)| {
                     self.should_select(
                         path.to_str()
-                            .expect(&format!("Unable to get path {:?}", path)),
+                            .unwrap_or_else(|| panic!("Unable to get path {:?}", path)),
                     )
                 })
                 .map(|(path, _)| FileHolder::from(path.clone()))
@@ -144,10 +142,8 @@ impl FolderHolder {
         self.current_holder = self
             .cache_holder
             .get(&self.current_directory)
-            .expect(&format!(
-                "Unable to get folder cache for {:?}",
-                self.current_directory
-            ))
+            .unwrap_or_else(|| panic!("Unable to get folder cache for {:?}",
+                self.current_directory))
             .child
             .clone();
         self.input.clear();
@@ -203,9 +199,7 @@ impl FolderHolder {
     pub fn peek(&self) -> &FileGroupHolder {
         self.cache_holder
             .peek(&self.current_directory)
-            .expect(&format!(
-                "Unable to get cache for {:?}",
-                self.current_directory
-            ))
+            .unwrap_or_else(|| panic!("Unable to get cache for {:?}",
+                self.current_directory))
     }
 }

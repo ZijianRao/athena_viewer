@@ -1,5 +1,5 @@
 use athena_viewer::app::App;
-use athena_viewer::state_holder::state_holder::{InputMode, ViewMode};
+use athena_viewer::state_holder::{InputMode, ViewMode};
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::Event;
 use ratatui::Terminal;
