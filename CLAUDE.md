@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Athena Viewer is a terminal-based file viewer application built in Rust using the `ratatui` TUI framework. It provides syntax-highlighted file viewing, directory navigation, and search functionality with a modal interface (Normal/Edit modes).
 
-**Current Status**: Prototype (v0.1.0) - Working features, but requires error handling and testing improvements for production readiness.
+**Current Status**: Prototype (v0.1.0) - Working features with consolidated module structure, requires error handling improvements for production readiness.
 
 ## How We Use Claude Code
 
@@ -37,26 +37,41 @@ The focus is on **learning Rust through code review** rather than automated code
 ## Project Structure
 
 ```
-src/
-├── main.rs              # Application entry point
-├── app/                 # Main application logic
-│   ├── mod.rs          # App struct and main loop
-│   └── state_handler/  # State-specific event handlers
-├── message_holder/      # File viewing and message display
-│   ├── mod.rs
-│   ├── message_holder.rs
-│   ├── file_helper.rs
-│   └── code_highlighter.rs
-└── state_holder/       # Application state management
-    ├── mod.rs
-    └── state_holder.rs
+athena_viewer/
+├── src/
+│   ├── main.rs              # Application entry point
+│   ├── lib.rs               # Library exports
+│   ├── app/                 # Main application logic
+│   │   ├── mod.rs          # App struct and main loop
+│   │   └── state_handler/  # State-specific event handlers
+│   │       ├── normal_search.rs
+│   │       ├── normal_file_view.rs
+│   │       ├── edit_search.rs
+│   │       └── edit_history_folder_view.rs
+│   ├── message_holder/      # File viewing and message display
+│   │   ├── mod.rs          # Consolidated: MessageHolder + submodules
+│   │   ├── file_helper.rs
+│   │   ├── folder_holder.rs
+│   │   └── code_highlighter.rs
+│   └── state_holder/        # Application state management
+│       ├── mod.rs          # Consolidated: StateHolder + enums
+├── Cargo.toml               # Dependencies and project config
+├── Cargo.lock               # Dependency lock file
+├── README.md                # User documentation
+├── CLAUDE.md                # This file (developer guide)
+├── RUST_CODE_REVIEW.md      # Code review and improvements
+└── target/                  # Build output (gitignored)
 ```
 
-- `Cargo.toml` - Project configuration and dependencies
-- `Cargo.lock` - Dependency lock file for reproducible builds
-- `CLAUDE.md` - This documentation file
-- `RUST_CODE_REVIEW.md` - Code review feedback and improvement suggestions
-- `target/` - Build output directory (gitignored)
+**Recent Refactoring** (Dec 24, 2025):
+- ✅ Merged `state_holder.rs` → `state_holder/mod.rs`
+- ✅ Merged `message_holder.rs` → `message_holder/mod.rs`
+- ✅ Simplified import paths throughout codebase
+
+**Documentation Files**:
+- `README.md` - User-facing documentation with features, installation, usage
+- `CLAUDE.md` - This file - development guidance and code review focus
+- `RUST_CODE_REVIEW.md` - Comprehensive code analysis and improvement roadmap
 
 ## Current Features
 
@@ -78,10 +93,17 @@ src/
 
 ### Key Components
 - `App` struct: Main application state and rendering
-- `StateHolder`: Manages application mode (`InputMode`, `ViewMode`)
-- `MessageHolder`: Handles file loading, caching, and display
+- `StateHolder`: Manages application mode (`InputMode`, `ViewMode`) - now in `state_holder/mod.rs`
+- `MessageHolder`: Coordinates file loading, caching, and display - now in `message_holder/mod.rs`
+- `FolderHolder`: Directory navigation and file search logic
+- `FileHelper`: File reading and text information processing
 - `CodeHighlighter`: Syntax highlighting using syntect
 - State handlers: Mode-specific event handling in `app/state_handler/`
+
+### Module Organization (Post-Refactoring)
+- `app/`: UI rendering and event dispatch
+- `state_holder/`: State machine and mode transitions (consolidated)
+- `message_holder/`: Data layer (filesystem, caching, highlighting - consolidated)
 
 ### Dependencies
 - `ratatui`: Terminal user interface framework
@@ -159,11 +181,19 @@ When reviewing code in this project, focus on:
 
 ## Recent Development History
 
-Based on git commits:
-- `e578cf4` feat: clear input line
-- `12c59a9` feat: normal search: delete, go up
-- `fe12125` fix: update current holder as well in refresh
-- `592a9f1` feat: duration logging of each operation
-- `db43da3` feat: collapse support for folder search
+Based on recent git commits:
 
-**Pattern**: Good feature iteration. Recent focus on UX and debugging capabilities.
+### Latest (Dec 24, 2025)
+- `1342cca` docs: add comprehensive README.md and update CLAUDE.md
+- `80a2721` refactor: consolidate module structure and improve organization
+- `7be549f` fix: invalid folder layzily handled
+- `9b07d37` fix: preserve input state and filters during mode transitions
+- `f232da9` test: history feature and working directory race condition fix
+
+### Previous
+- `32875cd` feat: integration test ongoing
+- `17e8aa4` feat: ongoing integration test
+- `51d1fd4` feat: unit test added
+- `5287ac2` fix: search state conversion order
+
+**Pattern**: Good progression from features → testing → bug fixes → refactoring. Recent focus on module consolidation and documentation.
