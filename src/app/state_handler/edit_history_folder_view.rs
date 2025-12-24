@@ -18,7 +18,7 @@ impl App {
                 KeyCode::Up => self.message_holder.move_up(),
                 KeyCode::Down => self.message_holder.move_down(),
                 KeyCode::Enter => {
-                    self.state_holder.borrow_mut().to_search();
+                    // self.state_holder.borrow_mut().to_search();
                     self.message_holder.submit();
                     if !self.state_holder.borrow().is_file_view() {
                         self.input.reset();

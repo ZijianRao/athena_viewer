@@ -70,8 +70,12 @@ impl From<PathBuf> for FileHolder {
 }
 
 impl FileHolder {
-    pub fn to_path(&self) -> Result<PathBuf, std::io::Error> {
-        self.parent.join(self.file_name.clone()).canonicalize()
+    pub fn to_path_canonicalize(&self) -> Result<PathBuf, std::io::Error> {
+        self.to_path().canonicalize()
+    }
+
+    pub fn to_path(&self) -> PathBuf {
+        self.parent.join(self.file_name.clone())
     }
 
     pub fn relative_to(&self, ref_path: &PathBuf) -> String {

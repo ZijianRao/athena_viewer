@@ -32,6 +32,16 @@ impl TestFileSystem {
         full_path
     }
 
+    pub fn remove_file(&self, path: &str) {
+        let full_path = self.root_path.join(path);
+        fs::remove_file(full_path).unwrap();
+    }
+
+    pub fn remove_folder(&self, path: &str) {
+        let full_path = self.root_path.join(path);
+        fs::remove_dir_all(full_path).unwrap();
+    }
+
     pub fn create_nested_structure(&self) {
         // root files
         self.create_file("README.md", "# Test Project\nThis is a readme.");

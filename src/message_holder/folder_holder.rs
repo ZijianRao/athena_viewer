@@ -48,7 +48,7 @@ impl FolderHolder {
             .current_holder
             .iter()
             .skip(1) // ignore ".." case
-            .filter_map(|p| p.to_path().ok())
+            .filter_map(|p| p.to_path_canonicalize().ok())
             .collect();
 
         let mut result: Vec<FileHolder> = value_path_group
@@ -91,7 +91,7 @@ impl FolderHolder {
                     .clone();
             } else {
                 key = item
-                    .to_path()
+                    .to_path_canonicalize()
                     .expect("Expect to have valid path")
                     .canonicalize()
                     .expect("Cannot canonicalize?")
@@ -189,7 +189,15 @@ impl FolderHolder {
     }
 
     pub fn submit(&mut self, index: usize) -> Result<PathBuf, std::io::Error> {
-        self.selected_path_holder[index].to_path()
+        self.selected_path_holder[index].to_path_canonicalize()
+    }
+
+    pub fn drop_invalid_folder(&mut self, index: usize) {
+        assert!(self.state_holder.borrow().is_history_search());
+        let removed = self.selected_path_holder.remove(index);
+        self.cache_holder
+            .pop(&removed.to_path())
+            .expect("Must contain the invalid path in cache");
     }
 
     pub fn peek(&self) -> &FileGroupHolder {

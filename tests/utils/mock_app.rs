@@ -108,7 +108,11 @@ impl TestApp {
             .iter()
             .map(|entry| {
                 if is_history_view {
-                    entry.to_path().unwrap().to_string_lossy().into_owned()
+                    entry
+                        .to_path_canonicalize()
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned()
                 } else {
                     entry.relative_to(&self.app.message_holder.folder_holder.current_directory)
                 }

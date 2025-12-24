@@ -126,6 +126,9 @@ impl MessageHolder {
         match new_entrypoint_canonicalized_result {
             Ok(new_entrypoint) => {
                 if new_entrypoint.is_dir() {
+                    if self.state_holder.borrow().is_history_search() {
+                        self.state_holder.borrow_mut().to_search();
+                    }
                     self.folder_holder
                         .submit_new_working_directory(new_entrypoint);
                 } else {
@@ -135,7 +138,13 @@ impl MessageHolder {
                     self.state_holder.borrow_mut().to_file_view();
                 }
             }
-            Err(_) => self.refresh_current_folder_cache(),
+            Err(_) => {
+                if self.state_holder.borrow().is_history_search() {
+                    self.folder_holder.drop_invalid_folder(highlight_index);
+                } else {
+                    self.refresh_current_folder_cache();
+                }
+            }
         }
     }
 
@@ -191,7 +200,7 @@ impl MessageHolder {
 
     fn get_text(&self, entry: &FileHolder) -> Result<String, std::io::Error> {
         if self.state_holder.borrow().is_history_search() {
-            Ok(entry.to_path()?.to_string_lossy().into_owned())
+            Ok(entry.to_path_canonicalize()?.to_string_lossy().into_owned())
         } else {
             Ok(entry.relative_to(&self.folder_holder.current_directory))
         }
