@@ -17,7 +17,7 @@ const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(100) {
 pub struct FolderHolder {
     state_holder: Rc<RefCell<StateHolder>>,
     cache_holder: LruCache<PathBuf, FileGroupHolder>,
-    input: String,
+    pub input: String,
     pub selected_path_holder: Vec<FileHolder>,
     pub current_directory: PathBuf,
     current_holder: Vec<FileHolder>,
@@ -63,7 +63,7 @@ impl FolderHolder {
             .collect();
         result.insert(0, first_item);
         self.current_holder = result;
-        self.update(&self.input.clone());
+        self.update(None);
         self.expand_level = self.expand_level.saturating_add(1);
     }
 
@@ -100,7 +100,7 @@ impl FolderHolder {
             }
         }
         self.current_holder = new_current_holder;
-        self.update(&self.input.clone());
+        self.update(None);
     }
 
     pub fn put(&mut self, path: &Path) {
@@ -108,8 +108,10 @@ impl FolderHolder {
         self.cache_holder.put(path.to_path_buf(), holder);
     }
 
-    pub fn update(&mut self, input: &str) {
-        self.input = input.to_string();
+    pub fn update(&mut self, input: Option<String>) {
+        if let Some(value) = input {
+            self.input = value;
+        }
 
         if self.state_holder.borrow().is_history_search() {
             self.selected_path_holder = self
@@ -142,19 +144,23 @@ impl FolderHolder {
         self.current_holder = self
             .cache_holder
             .get(&self.current_directory)
-            .unwrap_or_else(|| panic!("Unable to get folder cache for {:?}",
-                self.current_directory))
+            .unwrap_or_else(|| {
+                panic!(
+                    "Unable to get folder cache for {:?}",
+                    self.current_directory
+                )
+            })
             .child
             .clone();
         self.input.clear();
-        self.update("");
+        self.update(None);
         self.expand_level = 0;
     }
 
     pub fn refresh(&mut self) {
         let holder = FileGroupHolder::new(self.current_directory.clone(), true);
         self.current_holder = holder.child.clone();
-        self.update(&self.input.clone());
+        self.update(None);
 
         self.cache_holder
             .put(self.current_directory.clone(), holder);
@@ -199,7 +205,6 @@ impl FolderHolder {
     pub fn peek(&self) -> &FileGroupHolder {
         self.cache_holder
             .peek(&self.current_directory)
-            .unwrap_or_else(|| panic!("Unable to get cache for {:?}",
-                self.current_directory))
+            .unwrap_or_else(|| panic!("Unable to get cache for {:?}", self.current_directory))
     }
 }

@@ -62,7 +62,7 @@ impl MessageHolder {
     pub fn move_down(&mut self) {
         self.raw_highlight_index = self.raw_highlight_index.saturating_add(1);
     }
-    pub fn update(&mut self, input: &str) {
+    pub fn update(&mut self, input: Option<String>) {
         self.folder_holder.update(input);
         self.reset_index();
     }
@@ -75,7 +75,7 @@ impl MessageHolder {
 
     pub fn to_parent(&mut self) {
         self.raw_highlight_index = 0;
-        self.update("");
+        self.update(None);
         self.submit();
     }
 
@@ -101,7 +101,8 @@ impl MessageHolder {
     }
 
     pub fn reset(&mut self) {
-        self.folder_holder.update("");
+        self.folder_holder.input.clear();
+        self.folder_holder.update(None);
         self.reset_file_view();
         self.reset_index();
     }

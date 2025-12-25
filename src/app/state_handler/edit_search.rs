@@ -26,10 +26,11 @@ impl App {
                         & key_event.modifiers.contains(KeyModifiers::CONTROL)
                     {
                         self.input.reset();
-                        self.message_holder.update("");
+                        self.message_holder.update(None);
                     } else {
                         self.input.handle_event(&event);
-                        self.message_holder.update(self.input.value());
+                        self.message_holder
+                            .update(Some(self.input.value().to_string()));
                     }
                 }
             }
