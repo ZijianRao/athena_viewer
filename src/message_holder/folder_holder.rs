@@ -171,23 +171,21 @@ impl FolderHolder {
             return true;
         }
 
-        let mut counter = 0;
-        for char in name.chars() {
-            if char.eq_ignore_ascii_case(
-                &self
-                    .input
-                    .chars()
-                    .nth(counter)
-                    .expect("Should not reach out of bounds"),
-            ) {
-                counter += 1;
-            }
-            if counter == self.input.len() {
-                return true;
+        // check if all charactoer in self.input appear in order (case-insensitive) in name
+        let mut input_iter = self.input.chars();
+        let mut next_to_match = input_iter.next();
+
+        for name_char in name.chars() {
+            match next_to_match {
+                Some(input_char) if name_char.eq_ignore_ascii_case(&input_char) => {
+                    next_to_match = input_iter.next();
+                }
+                None => return true,
+                _ => (),
             }
         }
 
-        false
+        next_to_match.is_none()
     }
 
     pub fn submit(&mut self, index: usize) -> Result<PathBuf, std::io::Error> {
