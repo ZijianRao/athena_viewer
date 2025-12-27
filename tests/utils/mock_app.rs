@@ -1,3 +1,4 @@
+use athena_viewer::app::app_error::AppResult;
 use athena_viewer::app::App;
 use athena_viewer::state_holder::{InputMode, ViewMode};
 use ratatui::backend::TestBackend;
@@ -22,7 +23,7 @@ impl TestApp {
     }
 
     /// send an event to the app and process it
-    pub fn send_event(&mut self, event: Event) {
+    pub fn send_event(&mut self, event: Event) -> AppResult<()> {
         // simulate the event handling that happens in the main loop
         // we need to manually call the appropriate handler based on the current state
 
@@ -33,19 +34,22 @@ impl TestApp {
         use ViewMode::*;
 
         match (input_mode, view_mode) {
-            (Normal, Search) => self.app.handle_normal_search_event(event),
-            (Normal, FileView) => self.app.handle_normal_file_view_event(event),
-            (Edit, HistoryFolderView) => self.app.handle_edit_history_folder_view_event(event),
-            (Edit, Search) => self.app.handle_edit_search_event(event),
+            (Normal, Search) => self.app.handle_normal_search_event(event)?,
+            (Normal, FileView) => self.app.handle_normal_file_view_event(event)?,
+            (Edit, HistoryFolderView) => self.app.handle_edit_history_folder_view_event(event)?,
+            (Edit, Search) => self.app.handle_edit_search_event(event)?,
             _ => (),
         }
+        Ok(())
     }
 
     /// send a sequence of events
-    pub fn send_events(&mut self, events: Vec<Event>) {
+    pub fn send_events(&mut self, events: Vec<Event>) -> AppResult<()> {
         for event in events {
-            self.send_event(event);
+            self.send_event(event)?;
         }
+
+        Ok(())
     }
 
     /// get current input mode

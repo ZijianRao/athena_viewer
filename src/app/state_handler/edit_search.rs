@@ -8,17 +8,18 @@ use ratatui::{
 };
 use tui_input::backend::crossterm::EventHandler;
 
+use crate::app::app_error::AppResult;
 use crate::app::App;
 
 impl App {
-    pub fn handle_edit_search_event(&mut self, event: Event) {
+    pub fn handle_edit_search_event(&mut self, event: Event) -> AppResult<()> {
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search(),
                 KeyCode::Up => self.message_holder.move_up(),
                 KeyCode::Down => self.message_holder.move_down(),
                 KeyCode::Enter => {
-                    self.message_holder.submit();
+                    self.message_holder.submit()?;
                     self.input.reset();
                 }
                 _ => {
@@ -35,6 +36,7 @@ impl App {
                 }
             }
         }
+        Ok(())
     }
     pub fn draw_edit_search(&mut self, help_area: Rect, frame: &mut Frame) {
         let instructions = Text::from(Line::from(vec![

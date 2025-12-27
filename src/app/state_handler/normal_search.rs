@@ -7,10 +7,11 @@ use ratatui::{
     Frame,
 };
 
+use crate::app::app_error::AppResult;
 use crate::app::App;
 
 impl App {
-    pub fn handle_normal_search_event(&mut self, event: Event) {
+    pub fn handle_normal_search_event(&mut self, event: Event) -> AppResult<()> {
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Char('u') => self.message_holder.refresh_current_folder_cache(),
@@ -23,14 +24,14 @@ impl App {
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search_edit(),
                 KeyCode::Char('k') | KeyCode::Up => {
                     if key_event.modifiers.contains(KeyModifiers::CONTROL) {
-                        self.message_holder.to_parent();
+                        self.message_holder.to_parent()?;
                     } else {
                         self.message_holder.move_up();
                     }
                 }
                 KeyCode::Char('j') | KeyCode::Down => self.message_holder.move_down(),
                 KeyCode::Enter => {
-                    self.message_holder.submit();
+                    self.message_holder.submit()?;
                     if !self.state_holder.borrow().is_file_view() {
                         self.input.reset();
                     }
@@ -44,6 +45,8 @@ impl App {
                 _ => {}
             }
         }
+
+        Ok(())
     }
 
     pub fn draw_help_normal_search(&mut self, help_area: Rect, frame: &mut Frame) {

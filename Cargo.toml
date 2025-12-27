@@ -9,6 +9,7 @@ tui-input = "0.14"
 chrono = { version = "0.4", features = ["serde"] }
 lru = "0.16"
 syntect = "5.3"
+thiserror = "2.0"
 
 [dev-dependencies]
 tempfile = "3.23"

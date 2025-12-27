@@ -29,7 +29,8 @@ mod navigation_tests {
             events::char('r'),
             events::char('c'),
             events::enter(),
-        ]);
+        ])
+        .unwrap();
         assert!(
             app.get_current_directory().ends_with("src"),
             "{}",
@@ -47,7 +48,8 @@ mod navigation_tests {
             events::char('r'),
             events::char('s'),
             events::enter(),
-        ]);
+        ])
+        .unwrap();
         // check filter is effective
         assert_eq!(app.get_visible_items(), vec!["lib.rs"]);
         // file view mode with lib.rs
@@ -55,7 +57,7 @@ mod navigation_tests {
         assert!(app.get_opened_file().is_some());
         assert!(app.get_opened_file().unwrap().ends_with("lib.rs"));
 
-        app.send_event(events::char('q'));
+        app.send_event(events::char('q')).unwrap();
         // check filter is still effective
         assert_eq!(app.get_visible_items(), vec!["lib.rs"]);
     }
@@ -76,16 +78,17 @@ mod navigation_tests {
             events::char('r'),
             events::char('c'),
             events::enter(),
-        ]);
+        ])
+        .unwrap();
         assert!(
             app.get_current_directory().ends_with("src"),
             "{}",
             app.get_current_directory().display()
         );
 
-        app.send_event(events::tab());
+        app.send_event(events::tab()).unwrap();
         assert!(app.is_normal_mode());
-        app.send_event(events::ctrl_k());
+        app.send_event(events::ctrl_k()).unwrap();
         assert_eq!(app.get_current_directory(), fs.path());
     }
 }

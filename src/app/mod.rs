@@ -7,7 +7,6 @@ use ratatui::{
     Frame,
 };
 use std::cell::RefCell;
-use std::io::{self};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
@@ -16,6 +15,7 @@ use tui_input::Input;
 
 use crate::message_holder::MessageHolder;
 use crate::state_holder::{InputMode, StateHolder, ViewMode};
+pub mod app_error;
 
 const MIN_INPUT_WIDTH: u16 = 3;
 const INPUT_WIDTH_PADDING: u16 = 3;
@@ -29,6 +29,7 @@ pub struct App {
     pub message_holder: MessageHolder,
     pub timer: Instant,
     pub duration: Duration,
+    pub log_message: String,
 }
 
 pub mod state_handler;
@@ -43,15 +44,28 @@ impl App {
             message_holder: MessageHolder::new(current_directory, Rc::clone(&state_holder)),
             timer: Instant::now(),
             duration: Duration::default(),
+            log_message: "".into(),
         }
     }
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> app_error::AppResult<()> {
         loop {
             terminal.draw(|frame| self.draw(frame))?;
-            self.handle_event();
+            let result = self.handle_event();
+            match result {
+                Err(err) => self.handle_error(err),
+                _ => (),
+            }
             if self.exit {
                 return Ok(());
             }
+        }
+    }
+    fn handle_error(&mut self, error: app_error::AppError) {
+        use app_error::AppError::*;
+        self.log_message = error.to_string();
+        match error {
+            Terminal(_) => self.exit = true,
+            _ => (),
         }
     }
     pub fn draw(&mut self, frame: &mut Frame) {
@@ -105,7 +119,7 @@ impl App {
     }
 
     pub fn draw_log_area(&self, area: Rect, frame: &mut Frame) {
-        let log = Paragraph::new(format!("Took {:.2?}", self.duration));
+        let log = Paragraph::new(format!("Took {:.2?} {}", self.duration, self.log_message));
         frame.render_widget(log, area);
     }
 
@@ -116,11 +130,14 @@ impl App {
         self.duration = self.timer.elapsed()
     }
 
-    pub fn handle_event(&mut self) {
+    pub fn handle_event(&mut self) -> app_error::AppResult<()> {
         use InputMode::*;
         use ViewMode::*;
-        if event::poll(TICK_RATE).expect("Unable handle the timeout applied!") {
-            let event = event::read().expect("Unable to handle key press event!");
+        if event::poll(TICK_RATE)
+            .map_err(|_| app_error::AppError::Terminal("Unable to pool".into()))?
+        {
+            let event = event::read()
+                .map_err(|_| app_error::AppError::Terminal("Unable to parse event".into()))?;
             let mut is_key_press_event = false;
 
             if let Event::Key(key_event) = &event {
@@ -133,16 +150,16 @@ impl App {
                 };
             };
             if self.exit {
-                return;
+                return Ok(());
             }
 
             let input_mode = self.state_holder.borrow().input_mode;
             let view_mode = self.state_holder.borrow().view_mode;
             match (input_mode, view_mode) {
-                (Normal, Search) => self.handle_normal_search_event(event),
-                (Normal, FileView) => self.handle_normal_file_view_event(event),
-                (Edit, HistoryFolderView) => self.handle_edit_history_folder_view_event(event),
-                (Edit, Search) => self.handle_edit_search_event(event),
+                (Normal, Search) => self.handle_normal_search_event(event)?,
+                (Normal, FileView) => self.handle_normal_file_view_event(event)?,
+                (Edit, HistoryFolderView) => self.handle_edit_history_folder_view_event(event)?,
+                (Edit, Search) => self.handle_edit_search_event(event)?,
                 _ => (),
             }
 
@@ -150,5 +167,6 @@ impl App {
                 self.since_mark();
             }
         }
+        Ok(())
     }
 }

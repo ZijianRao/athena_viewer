@@ -17,6 +17,7 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use crate::app::app_error::AppResult;
 use crate::message_holder::code_highlighter::CodeHighlighter;
 use crate::message_holder::file_helper::{FileHolder, FileTextInfo};
 use crate::message_holder::folder_holder::FolderHolder;
@@ -73,10 +74,11 @@ impl MessageHolder {
         self.folder_holder.collapse();
     }
 
-    pub fn to_parent(&mut self) {
+    pub fn to_parent(&mut self) -> AppResult<()> {
         self.raw_highlight_index = 0;
         self.update(None);
-        self.submit();
+        self.submit()?;
+        Ok(())
     }
 
     pub fn delete(&mut self) {
@@ -120,10 +122,10 @@ impl MessageHolder {
         remainder.try_into().expect("Unexpected!")
     }
 
-    pub fn submit(&mut self) {
+    pub fn submit(&mut self) -> AppResult<()> {
         let path_holder = &self.folder_holder.selected_path_holder;
         if path_holder.is_empty() {
-            return;
+            return Ok(());
         }
 
         let highlight_index = self.get_highlight_index(path_holder.len());
@@ -138,7 +140,7 @@ impl MessageHolder {
                         .submit_new_working_directory(new_entrypoint);
                 } else {
                     self.file_text_info =
-                        Some(FileTextInfo::new(&new_entrypoint, &self.code_highlighter));
+                        Some(FileTextInfo::new(&new_entrypoint, &self.code_highlighter)?);
                     self.file_opened = Some(new_entrypoint);
                     self.state_holder.borrow_mut().to_file_view();
                 }
@@ -151,6 +153,8 @@ impl MessageHolder {
                 }
             }
         }
+
+        Ok(())
     }
 
     pub fn draw(&mut self, area: Rect, frame: &mut Frame) {

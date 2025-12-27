@@ -7,6 +7,8 @@ use syntect::{
     util::LinesWithEndings,
 };
 
+use crate::app::app_error::{AppError, AppResult};
+
 #[derive(Debug)]
 pub struct CodeHighlighter {
     syntax_set: SyntaxSet,
@@ -32,14 +34,18 @@ impl CodeHighlighter {
             .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
     }
 
-    fn get_highlighted_code(&self, code: &str, syntax: &SyntaxReference) -> Vec<Line<'static>> {
+    fn get_highlighted_code(
+        &self,
+        code: &str,
+        syntax: &SyntaxReference,
+    ) -> AppResult<Vec<Line<'static>>> {
         let mut highlighter = HighlightLines::new(syntax, &self.theme);
         let mut lines = Vec::new();
 
         for line in LinesWithEndings::from(code) {
             let ranges = highlighter
                 .highlight_line(line, &self.syntax_set)
-                .expect("Unable to apply highlight for text file!");
+                .map_err(|_| AppError::Parse("Unable to apply highlight for text file!".into()))?;
             let spans = ranges
                 .into_iter()
                 .map(|(style, text)| {
@@ -55,10 +61,10 @@ impl CodeHighlighter {
                 .collect::<Vec<_>>();
             lines.push(Line::from(spans));
         }
-        lines
+        Ok(lines)
     }
 
-    pub fn highlight(&self, code: &str, file_path: &Path) -> Vec<Line<'static>> {
+    pub fn highlight(&self, code: &str, file_path: &Path) -> AppResult<Vec<Line<'static>>> {
         let syntax = self.get_syntax(file_path);
         self.get_highlighted_code(code, syntax)
     }
@@ -76,6 +82,6 @@ mod tests {
         let code = "abc \n cde";
 
         let out = highlighter.get_highlighted_code(code, syntax);
-        assert_eq!(out.len(), 2)
+        assert_eq!(out.unwrap().len(), 2)
     }
 }

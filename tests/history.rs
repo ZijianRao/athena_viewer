@@ -20,7 +20,8 @@ mod history_tests {
             events::char('r'),
             events::char('c'),
             events::enter(),
-        ]);
+        ])
+        .unwrap();
 
         // add nested folder into history
         app.send_events(vec![
@@ -31,7 +32,8 @@ mod history_tests {
             events::char('e'),
             events::char('d'),
             events::enter(),
-        ]);
+        ])
+        .unwrap();
 
         // add nested folder into history
         app.send_events(vec![
@@ -40,9 +42,11 @@ mod history_tests {
             events::char('e'),
             events::char('p'),
             events::enter(),
-        ]);
+        ])
+        .unwrap();
 
-        app.send_events(vec![events::tab(), events::char('h')]);
+        app.send_events(vec![events::tab(), events::char('h')])
+            .unwrap();
         assert!(app.is_history_view());
         let mut history = Vec::new();
         let mut expected_suffix = ["src/nested/deep", "src/nested", "src"];
@@ -54,7 +58,8 @@ mod history_tests {
 
         assert_eq!(app.get_visible_items(), history);
 
-        app.send_events(vec![events::down(), events::down(), events::enter()]);
+        app.send_events(vec![events::down(), events::down(), events::enter()])
+            .unwrap();
         let mut visible_items = vec!["..", "lib.rs", "module.rs", "nested"];
         visible_items.sort();
         assert_eq!(app.get_visible_items(), visible_items);
@@ -75,7 +80,8 @@ mod history_tests {
             events::char('r'),
             events::char('c'),
             events::enter(),
-        ]);
+        ])
+        .unwrap();
 
         // add nested folder into history
         app.send_events(vec![
@@ -86,9 +92,11 @@ mod history_tests {
             events::char('e'),
             events::char('d'),
             events::enter(),
-        ]);
+        ])
+        .unwrap();
 
-        app.send_events(vec![events::tab(), events::char('h')]);
+        app.send_events(vec![events::tab(), events::char('h')])
+            .unwrap();
         assert!(app.is_history_view());
         let mut history = Vec::new();
 
@@ -109,7 +117,7 @@ mod history_tests {
         }
         history.push(fs.path().to_str().unwrap().to_string());
 
-        app.send_events(vec![events::enter()]);
+        app.send_events(vec![events::enter()]).unwrap();
         assert_eq!(app.get_visible_items(), history);
     }
 }

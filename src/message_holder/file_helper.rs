@@ -4,6 +4,7 @@ use chrono::{DateTime, Local};
 use ratatui::text::Line;
 use std::path::PathBuf;
 
+use crate::app::app_error::AppResult;
 use crate::message_holder::code_highlighter::CodeHighlighter;
 
 #[derive(Debug)]
@@ -27,7 +28,7 @@ pub struct FileGroupHolder {
 }
 
 impl FileTextInfo {
-    pub fn new(value: &PathBuf, code_highlighter: &CodeHighlighter) -> Self {
+    pub fn new(value: &PathBuf, code_highlighter: &CodeHighlighter) -> AppResult<Self> {
         let content = match fs::read_to_string(value) {
             Ok(text) => text,
             Err(_) => "Unable to read...".to_string(),
@@ -35,11 +36,11 @@ impl FileTextInfo {
 
         let (n_rows, max_line_length) = Self::get_string_dimensions(&content);
 
-        Self {
+        Ok(Self {
             n_rows,
             max_line_length,
-            formatted_text: code_highlighter.highlight(&content, value),
-        }
+            formatted_text: code_highlighter.highlight(&content, value)?,
+        })
     }
 
     fn get_string_dimensions(text: &str) -> (usize, usize) {
@@ -79,9 +80,13 @@ impl FileHolder {
     }
 
     pub fn relative_to(&self, ref_path: &PathBuf) -> String {
-        let rel_path = self.parent.strip_prefix(ref_path).unwrap_or_else(|_| panic!("Can not get path prefix from {} for {}",
-            self.parent.to_string_lossy(),
-            ref_path.to_string_lossy()));
+        let rel_path = self.parent.strip_prefix(ref_path).unwrap_or_else(|_| {
+            panic!(
+                "Can not get path prefix from {} for {}",
+                self.parent.to_string_lossy(),
+                ref_path.to_string_lossy()
+            )
+        });
         let prefix = rel_path.to_string_lossy();
         if prefix.is_empty() {
             self.file_name.clone()
@@ -137,7 +142,7 @@ mod tests {
     fn test_file_text_info() -> Result<(), Box<dyn std::error::Error>> {
         let path = get_temp_file()?;
         let code_highlighter = CodeHighlighter::default();
-        let file_text_info = FileTextInfo::new(&path, &code_highlighter);
+        let file_text_info = FileTextInfo::new(&path, &code_highlighter).unwrap();
         assert_eq!(file_text_info.n_rows, 1);
         assert_eq!(file_text_info.max_line_length, 17);
         Ok(())

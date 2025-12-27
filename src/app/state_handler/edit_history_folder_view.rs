@@ -8,18 +8,18 @@ use ratatui::{
 };
 use tui_input::backend::crossterm::EventHandler;
 
+use crate::app::app_error::AppResult;
 use crate::app::App;
 
 impl App {
-    pub fn handle_edit_history_folder_view_event(&mut self, event: Event) {
+    pub fn handle_edit_history_folder_view_event(&mut self, event: Event) -> AppResult<()> {
         if let Event::Key(key_event) = event {
             match key_event.code {
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search(),
                 KeyCode::Up => self.message_holder.move_up(),
                 KeyCode::Down => self.message_holder.move_down(),
                 KeyCode::Enter => {
-                    // self.state_holder.borrow_mut().to_search();
-                    self.message_holder.submit();
+                    self.message_holder.submit()?;
                     if !self.state_holder.borrow().is_file_view() {
                         self.input.reset();
                     }
@@ -32,6 +32,8 @@ impl App {
                 }
             }
         }
+
+        Ok(())
     }
     pub fn draw_help_edit_history_folder_view(&mut self, help_area: Rect, frame: &mut Frame) {
         let instructions = Text::from(Line::from(vec![
