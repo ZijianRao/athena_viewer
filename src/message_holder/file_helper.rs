@@ -4,7 +4,7 @@ use chrono::{DateTime, Local};
 use ratatui::text::Line;
 use std::path::PathBuf;
 
-use crate::app::app_error::AppResult;
+use crate::app::app_error::{AppError, AppResult};
 use crate::message_holder::code_highlighter::CodeHighlighter;
 
 #[derive(Debug)]
@@ -51,22 +51,29 @@ impl FileTextInfo {
     }
 }
 
-impl From<PathBuf> for FileHolder {
-    fn from(path: PathBuf) -> Self {
+impl TryFrom<PathBuf> for FileHolder {
+    type Error = AppError;
+    fn try_from(path: PathBuf) -> AppResult<Self> {
         let file_name = path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| panic!("Unable to get file name for {:?}", path));
+            .ok_or(AppError::Path(format!(
+                "Unable to get file name for {:?}",
+                path
+            )))?;
 
         let is_file = path.is_file();
-        FileHolder {
+        Ok(FileHolder {
             parent: path
                 .parent()
-                .expect("Must have a valid parent folder")
+                .ok_or(AppError::Path(format!(
+                    "Unable to get parent folder for {:?}",
+                    path,
+                )))?
                 .to_path_buf(),
             file_name,
             is_file,
-        }
+        })
     }
 }
 
@@ -97,7 +104,7 @@ impl FileHolder {
 }
 
 impl FileGroupHolder {
-    pub fn new(path: PathBuf, adding_parent_shortcut: bool) -> Self {
+    pub fn new(path: PathBuf, adding_parent_shortcut: bool) -> AppResult<Self> {
         let mut entries = Vec::new();
 
         // add if not at root
@@ -114,14 +121,14 @@ impl FileGroupHolder {
         entries.extend(
             fs::read_dir(&path)
                 .unwrap_or_else(|_| panic!("Unable to read directory for {:?}", path))
-                .filter_map(|entry| entry.ok().map(|e| FileHolder::from(e.path()))),
+                .filter_map(|entry| entry.ok().map(|e| FileHolder::try_from(e.path()))),
         );
 
         entries.sort_by_key(|f| f.file_name.clone());
-        Self {
+        Ok(Self {
             child: entries,
             update_time: Local::now(),
-        }
+        })
     }
 }
 
@@ -134,7 +141,7 @@ mod tests {
     #[test]
     fn test_file_holder() -> Result<(), Box<dyn std::error::Error>> {
         let path = get_temp_file()?;
-        let _ = FileHolder::from(path);
+        let _ = FileHolder::try_from(path).unwrap();
         Ok(())
     }
 

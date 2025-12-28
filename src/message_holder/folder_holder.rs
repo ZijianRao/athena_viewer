@@ -5,6 +5,7 @@ use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use crate::app::app_error::{AppError, AppResult};
 use crate::message_holder::file_helper::{FileGroupHolder, FileHolder};
 use crate::state_holder::StateHolder;
 
@@ -25,13 +26,16 @@ pub struct FolderHolder {
 }
 
 impl FolderHolder {
-    pub fn new(current_directory: PathBuf, state_holder: Rc<RefCell<StateHolder>>) -> Self {
-        let holder = FileGroupHolder::new(current_directory.clone(), true);
+    pub fn new(
+        current_directory: PathBuf,
+        state_holder: Rc<RefCell<StateHolder>>,
+    ) -> AppResult<Self> {
+        let holder = FileGroupHolder::new(current_directory.clone(), true)?;
         let current_holder: Vec<FileHolder> = holder.child.clone().into_iter().collect();
         let mut cache_holder = LruCache::new(DEFAULT_CACHE_SIZE);
         cache_holder.put(current_directory.clone(), holder);
 
-        FolderHolder {
+        Ok(FolderHolder {
             state_holder,
             cache_holder,
             current_directory,
@@ -39,10 +43,10 @@ impl FolderHolder {
             selected_path_holder: current_holder.clone(),
             current_holder,
             expand_level: 0,
-        }
+        })
     }
 
-    pub fn expand(&mut self) {
+    pub fn expand(&mut self) -> AppResult<()> {
         let first_item = self.current_holder[0].clone();
         let value_path_group: Vec<PathBuf> = self
             .current_holder
@@ -51,25 +55,28 @@ impl FolderHolder {
             .filter_map(|p| p.to_path_canonicalize().ok())
             .collect();
 
-        let mut result: Vec<FileHolder> = value_path_group
-            .iter()
-            .flat_map(|p| {
-                if p.is_dir() {
-                    FileGroupHolder::new(p.clone(), false).child
-                } else {
-                    vec![FileHolder::from(p.clone())]
-                }
-            })
-            .collect();
+        let mut result = Vec::new();
+        for p in &value_path_group {
+            if p.is_dir() {
+                let group = FileGroupHolder::new(p.clone(), false)?;
+                result.extend(group.child);
+            } else {
+                let file_holder = FileHolder::try_from(p.clone())?;
+                result.push(file_holder);
+            }
+        }
+
         result.insert(0, first_item);
         self.current_holder = result;
         self.update(None);
         self.expand_level = self.expand_level.saturating_add(1);
+
+        Ok(())
     }
 
-    pub fn collapse(&mut self) {
+    pub fn collapse(&mut self) -> AppResult<()> {
         if self.expand_level == 0 {
-            return;
+            return Ok(());
         }
         self.expand_level = self.expand_level.saturating_sub(1);
 
@@ -95,36 +102,38 @@ impl FolderHolder {
             };
 
             if !selected_path_ref.contains(&key) {
-                new_current_holder.push(FileHolder::from(key.clone()));
+                new_current_holder.push(FileHolder::try_from(key.clone())?);
                 selected_path_ref.insert(key);
             }
         }
         self.current_holder = new_current_holder;
         self.update(None);
+
+        Ok(())
     }
 
-    pub fn put(&mut self, path: &Path) {
-        let holder = FileGroupHolder::new(path.to_path_buf(), true);
+    pub fn put(&mut self, path: &Path) -> AppResult<()> {
+        let holder = FileGroupHolder::new(path.to_path_buf(), true)?;
         self.cache_holder.put(path.to_path_buf(), holder);
+
+        Ok(())
     }
 
-    pub fn update(&mut self, input: Option<String>) {
+    pub fn update(&mut self, input: Option<String>) -> AppResult<()> {
         if let Some(value) = input {
             self.input = value;
         }
 
         if self.state_holder.borrow().is_history_search() {
-            self.selected_path_holder = self
-                .cache_holder
-                .iter()
-                .filter(|(path, _)| {
-                    self.should_select(
-                        path.to_str()
-                            .unwrap_or_else(|| panic!("Unable to get path {:?}", path)),
-                    )
-                })
-                .map(|(path, _)| FileHolder::from(path.clone()))
-                .collect();
+            let mut selected_path_holder = Vec::new();
+            for (path, _) in &self.cache_holder {
+                if let Some(path_str) = path.to_str() {
+                    if self.should_select(path_str) {
+                        let file_holder = FileHolder::try_from(path.clone())?;
+                        selected_path_holder.push(file_holder);
+                    }
+                }
+            }
         } else {
             self.selected_path_holder = self
                 .current_holder
@@ -133,37 +142,46 @@ impl FolderHolder {
                 .filter(|entry| self.should_select(&entry.relative_to(&self.current_directory)))
                 .collect();
         }
+
+        Ok(())
     }
 
-    pub fn submit_new_working_directory(&mut self, path: PathBuf) {
+    pub fn submit_new_working_directory(&mut self, path: PathBuf) -> AppResult<()> {
         if self.cache_holder.get(&path).is_none() {
-            self.put(&path)
+            self.put(&path)?
         }
 
         self.current_directory = path;
-        self.current_holder = self
-            .cache_holder
-            .get(&self.current_directory)
-            .unwrap_or_else(|| {
-                panic!(
+        let cache_result =
+            self.cache_holder
+                .get(&self.current_directory)
+                .ok_or(AppError::Cache(format!(
                     "Unable to get folder cache for {:?}",
                     self.current_directory
-                )
-            })
-            .child
-            .clone();
+                )))?;
+
+        self.current_holder = cache_result.child.clone();
+
         self.input.clear();
-        self.update(None);
+        self.update(None)?;
         self.expand_level = 0;
+
+        Ok(())
     }
 
-    pub fn refresh(&mut self) {
-        let holder = FileGroupHolder::new(self.current_directory.clone(), true);
+    pub fn refresh(&mut self) -> AppResult<()> {
+        let holder = FileGroupHolder::new(self.current_directory.clone(), true)?;
         self.current_holder = holder.child.clone();
-        self.update(None);
+        self.update(None)?;
 
         self.cache_holder
-            .put(self.current_directory.clone(), holder);
+            .put(self.current_directory.clone(), holder)
+            .ok_or(AppError::Cache(format!(
+                "Unable to insert folder cache for {:?}",
+                self.current_directory
+            )))?;
+
+        Ok(())
     }
 
     fn should_select(&self, name: &str) -> bool {

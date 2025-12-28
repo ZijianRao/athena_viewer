@@ -13,6 +13,8 @@ pub enum AppError {
     State(String),
     #[error("Terminal error: {0}")]
     Terminal(String),
+    #[error("Cache error: {0}")]
+    Cache(String),
 }
 
 pub type AppResult<T> = Result<T, AppError>;
