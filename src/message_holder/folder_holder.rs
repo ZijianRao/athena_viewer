@@ -68,7 +68,7 @@ impl FolderHolder {
 
         result.insert(0, first_item);
         self.current_holder = result;
-        self.update(None);
+        self.update(None)?;
         self.expand_level = self.expand_level.saturating_add(1);
 
         Ok(())
@@ -107,7 +107,7 @@ impl FolderHolder {
             }
         }
         self.current_holder = new_current_holder;
-        self.update(None);
+        self.update(None)?;
 
         Ok(())
     }

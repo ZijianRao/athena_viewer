@@ -28,7 +28,7 @@ impl App {
                 _ => {
                     self.input.handle_event(&event);
                     self.message_holder
-                        .update(Some(self.input.value().to_string()));
+                        .update(Some(self.input.value().to_string()))?;
                 }
             }
         }

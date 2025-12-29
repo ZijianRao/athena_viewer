@@ -34,18 +34,18 @@ pub struct App {
 
 pub mod state_handler;
 impl App {
-    pub fn new(current_directory: PathBuf) -> Self {
+    pub fn new(current_directory: PathBuf) -> app_error::AppResult<Self> {
         let state_holder = Rc::new(RefCell::new(StateHolder::default()));
 
-        App {
+        Ok(App {
             state_holder: Rc::clone(&state_holder),
             input: Input::default(),
             exit: false,
-            message_holder: MessageHolder::new(current_directory, Rc::clone(&state_holder)),
+            message_holder: MessageHolder::new(current_directory, Rc::clone(&state_holder))?,
             timer: Instant::now(),
             duration: Duration::default(),
             log_message: "".into(),
-        }
+        })
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> app_error::AppResult<()> {
         loop {

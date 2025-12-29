@@ -12,7 +12,7 @@ mod history_tests {
         fs.create_nested_structure();
 
         // create app in test directory
-        let mut app = TestApp::new(fs.path().to_path_buf());
+        let mut app = TestApp::new(fs.path().to_path_buf()).unwrap();
 
         // add src folder into history
         app.send_events(vec![
@@ -72,7 +72,7 @@ mod history_tests {
         fs.create_nested_structure();
 
         // create app in test directory
-        let mut app = TestApp::new(fs.path().to_path_buf());
+        let mut app = TestApp::new(fs.path().to_path_buf()).unwrap();
 
         // add src folder into history
         app.send_events(vec![

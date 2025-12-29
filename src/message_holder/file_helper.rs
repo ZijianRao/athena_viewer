@@ -118,11 +118,15 @@ impl FileGroupHolder {
             }
         }
 
-        entries.extend(
-            fs::read_dir(&path)
-                .unwrap_or_else(|_| panic!("Unable to read directory for {:?}", path))
-                .filter_map(|entry| entry.ok().map(|e| FileHolder::try_from(e.path()))),
-        );
+        let read_dir_result = fs::read_dir(&path)
+            .map_err(|_| AppError::Parse(format!("Unable to read {}", path.to_string_lossy())))?;
+
+        for entry in read_dir_result {
+            if let Ok(e) = entry {
+                let file_holder = FileHolder::try_from(e.path())?;
+                entries.push(file_holder);
+            }
+        }
 
         entries.sort_by_key(|f| f.file_name.clone());
         Ok(Self {

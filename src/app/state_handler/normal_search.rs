@@ -14,13 +14,13 @@ impl App {
     pub fn handle_normal_search_event(&mut self, event: Event) -> AppResult<()> {
         if let Event::Key(key_event) = event {
             match key_event.code {
-                KeyCode::Char('u') => self.message_holder.refresh_current_folder_cache(),
+                KeyCode::Char('u') => self.message_holder.refresh_current_folder_cache()?,
                 KeyCode::Char('h') => {
                     self.state_holder.borrow_mut().to_history_search();
-                    self.message_holder.reset();
+                    self.message_holder.reset()?;
                 }
-                KeyCode::Char('e') => self.message_holder.expand(),
-                KeyCode::Char('c') => self.message_holder.collapse(),
+                KeyCode::Char('e') => self.message_holder.expand()?,
+                KeyCode::Char('c') => self.message_holder.collapse()?,
                 KeyCode::Tab => self.state_holder.borrow_mut().to_search_edit(),
                 KeyCode::Char('k') | KeyCode::Up => {
                     if key_event.modifiers.contains(KeyModifiers::CONTROL) {
@@ -38,7 +38,7 @@ impl App {
                 }
                 KeyCode::Char('d') => {
                     if key_event.modifiers.contains(KeyModifiers::CONTROL) {
-                        self.message_holder.delete();
+                        self.message_holder.delete()?;
                     }
                 }
 

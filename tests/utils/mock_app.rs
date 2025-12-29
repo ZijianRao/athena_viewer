@@ -13,13 +13,13 @@ pub struct TestApp {
 
 impl TestApp {
     /// create a new test app starting in a specific directory
-    pub fn new(start_dir: PathBuf) -> Self {
+    pub fn new(start_dir: PathBuf) -> AppResult<Self> {
         // change to test directory
 
         let terminal = super::mock_terminal::create_test_terminal();
-        let app = App::new(start_dir);
+        let app = App::new(start_dir)?;
 
-        Self { app, terminal }
+        Ok(Self { app, terminal })
     }
 
     /// send an event to the app and process it

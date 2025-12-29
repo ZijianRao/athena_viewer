@@ -38,12 +38,15 @@ pub struct MessageHolder {
 }
 
 impl MessageHolder {
-    pub fn new(current_directory: PathBuf, state_holder: Rc<RefCell<StateHolder>>) -> Self {
+    pub fn new(
+        current_directory: PathBuf,
+        state_holder: Rc<RefCell<StateHolder>>,
+    ) -> AppResult<Self> {
         let state_holder_ref = Rc::clone(&state_holder);
-        MessageHolder {
+        Ok(MessageHolder {
             state_holder,
             code_highlighter: CodeHighlighter::default(),
-            folder_holder: FolderHolder::new(current_directory, state_holder_ref),
+            folder_holder: FolderHolder::new(current_directory, state_holder_ref)?,
             raw_highlight_index: 0,
             file_opened: Default::default(),
             file_text_info: Default::default(),
@@ -51,7 +54,7 @@ impl MessageHolder {
             horizontal_scroll_state: Default::default(),
             vertical_scroll: Default::default(),
             horizontal_scroll: Default::default(),
-        }
+        })
     }
 
     pub fn reset_index(&mut self) {
@@ -63,28 +66,31 @@ impl MessageHolder {
     pub fn move_down(&mut self) {
         self.raw_highlight_index = self.raw_highlight_index.saturating_add(1);
     }
-    pub fn update(&mut self, input: Option<String>) {
-        self.folder_holder.update(input);
+    pub fn update(&mut self, input: Option<String>) -> AppResult<()> {
+        self.folder_holder.update(input)?;
         self.reset_index();
+        Ok(())
     }
-    pub fn expand(&mut self) {
-        self.folder_holder.expand();
+    pub fn expand(&mut self) -> AppResult<()> {
+        self.folder_holder.expand()?;
+        Ok(())
     }
-    pub fn collapse(&mut self) {
-        self.folder_holder.collapse();
+    pub fn collapse(&mut self) -> AppResult<()> {
+        self.folder_holder.collapse()?;
+        Ok(())
     }
 
     pub fn to_parent(&mut self) -> AppResult<()> {
         self.raw_highlight_index = 0;
-        self.update(None);
+        self.update(None)?;
         self.submit()?;
         Ok(())
     }
 
-    pub fn delete(&mut self) {
+    pub fn delete(&mut self) -> AppResult<()> {
         let path_holder = &self.folder_holder.selected_path_holder;
         if path_holder.is_empty() {
-            return;
+            return Ok(());
         }
 
         let highlight_index = self.get_highlight_index(path_holder.len());
@@ -94,19 +100,22 @@ impl MessageHolder {
             } else {
                 let _ = fs::remove_file(path);
             }
-            self.folder_holder.refresh();
+            self.folder_holder.refresh()?;
         }
+        Ok(())
     }
 
-    pub fn refresh_current_folder_cache(&mut self) {
-        self.folder_holder.refresh();
+    pub fn refresh_current_folder_cache(&mut self) -> AppResult<()> {
+        self.folder_holder.refresh()?;
+        Ok(())
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self) -> AppResult<()> {
         self.folder_holder.input.clear();
-        self.folder_holder.update(None);
+        self.folder_holder.update(None)?;
         self.reset_file_view();
         self.reset_index();
+        Ok(())
     }
 
     pub fn reset_file_view(&mut self) {
@@ -137,7 +146,7 @@ impl MessageHolder {
                         self.state_holder.borrow_mut().to_search();
                     }
                     self.folder_holder
-                        .submit_new_working_directory(new_entrypoint);
+                        .submit_new_working_directory(new_entrypoint)?;
                 } else {
                     self.file_text_info =
                         Some(FileTextInfo::new(&new_entrypoint, &self.code_highlighter)?);
@@ -149,7 +158,7 @@ impl MessageHolder {
                 if self.state_holder.borrow().is_history_search() {
                     self.folder_holder.drop_invalid_folder(highlight_index);
                 } else {
-                    self.refresh_current_folder_cache();
+                    self.refresh_current_folder_cache()?;
                 }
             }
         }

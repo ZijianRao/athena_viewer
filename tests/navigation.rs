@@ -12,7 +12,7 @@ mod navigation_tests {
         fs.create_nested_structure();
 
         // create app in test directory
-        let mut app = TestApp::new(fs.path().to_path_buf());
+        let mut app = TestApp::new(fs.path().to_path_buf()).unwrap();
         assert_eq!(app.get_current_directory(), fs.path());
 
         // verify initial state
@@ -69,7 +69,7 @@ mod navigation_tests {
         fs.create_nested_structure();
 
         // create app in test directory
-        let mut app = TestApp::new(fs.path().to_path_buf());
+        let mut app = TestApp::new(fs.path().to_path_buf()).unwrap();
         assert_eq!(app.get_current_directory(), fs.path());
 
         // navigate down to and enter 'src/' directory
