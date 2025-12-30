@@ -134,6 +134,7 @@ impl FolderHolder {
                     }
                 }
             }
+            self.selected_path_holder = selected_path_holder;
         } else {
             self.selected_path_holder = self
                 .current_holder
