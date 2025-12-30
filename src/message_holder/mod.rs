@@ -17,7 +17,7 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use crate::app::app_error::AppResult;
+use crate::app::app_error::{AppError, AppResult};
 use crate::message_holder::code_highlighter::CodeHighlighter;
 use crate::message_holder::file_helper::{FileHolder, FileTextInfo};
 use crate::message_holder::folder_holder::FolderHolder;
@@ -93,7 +93,7 @@ impl MessageHolder {
             return Ok(());
         }
 
-        let highlight_index = self.get_highlight_index(path_holder.len());
+        let highlight_index = self.get_highlight_index(path_holder.len())?;
         if let Ok(path) = self.folder_holder.submit(highlight_index) {
             if path.is_dir() {
                 let _ = fs::remove_dir_all(path);
@@ -123,12 +123,15 @@ impl MessageHolder {
         self.file_text_info = None;
     }
 
-    fn get_highlight_index(&self, group_len: usize) -> usize {
+    fn get_highlight_index(&self, group_len: usize) -> AppResult<usize> {
         let divisor: i32 = group_len
             .try_into()
-            .expect("Cannot convert group len of path_group");
+            .map_err(|_| AppError::Parse("Cannot convert group len of path_group".into()))?;
         let remainder = self.raw_highlight_index.rem_euclid(divisor);
-        remainder.try_into().expect("Unexpected!")
+        let out: usize = remainder
+            .try_into()
+            .map_err(|_| AppError::Parse("Cannot convert group len of path_group".into()))?;
+        Ok(out)
     }
 
     pub fn submit(&mut self) -> AppResult<()> {
@@ -137,7 +140,7 @@ impl MessageHolder {
             return Ok(());
         }
 
-        let highlight_index = self.get_highlight_index(path_holder.len());
+        let highlight_index = self.get_highlight_index(path_holder.len())?;
         let new_entrypoint_canonicalized_result = self.folder_holder.submit(highlight_index);
         match new_entrypoint_canonicalized_result {
             Ok(new_entrypoint) => {
@@ -156,7 +159,7 @@ impl MessageHolder {
             }
             Err(_) => {
                 if self.state_holder.borrow().is_history_search() {
-                    self.folder_holder.drop_invalid_folder(highlight_index);
+                    self.folder_holder.drop_invalid_folder(highlight_index)?;
                 } else {
                     self.refresh_current_folder_cache()?;
                 }
@@ -169,10 +172,7 @@ impl MessageHolder {
     pub fn draw(&mut self, area: Rect, frame: &mut Frame) -> AppResult<()> {
         match self.file_opened.clone() {
             None => self.draw_folder_view(area, frame),
-            Some(file_path) => {
-                self.draw_file_view(area, frame, &file_path);
-                Ok(())
-            }
+            Some(file_path) => self.draw_file_view(area, frame, &file_path),
         }
     }
 
@@ -195,7 +195,7 @@ impl MessageHolder {
             return Ok(());
         }
 
-        let highlight_index = self.get_highlight_index(path_holder.len());
+        let highlight_index = self.get_highlight_index(path_holder.len())?;
         if let Some(path) = path_holder.get_mut(highlight_index) {
             *path = path.clone().add_modifier(Modifier::REVERSED);
         };
@@ -227,11 +227,11 @@ impl MessageHolder {
         }
     }
 
-    fn draw_file_view(&mut self, area: Rect, frame: &mut Frame, file_path: &Path) {
+    fn draw_file_view(&mut self, area: Rect, frame: &mut Frame, file_path: &Path) -> AppResult<()> {
         let file_text_info = self
             .file_text_info
             .as_ref()
-            .expect("Unable to get text file info!");
+            .ok_or(AppError::Parse("Unexpected, file should be opened".into()))?;
         let file_preview = Paragraph::new(file_text_info.formatted_text.clone())
             .block(Block::default().title(file_path.to_string_lossy().into_owned()))
             .scroll((self.vertical_scroll as u16, self.horizontal_scroll as u16));
@@ -253,5 +253,6 @@ impl MessageHolder {
             }),
             &mut self.horizontal_scroll_state,
         );
+        Ok(())
     }
 }

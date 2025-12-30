@@ -212,12 +212,15 @@ impl FolderHolder {
         self.selected_path_holder[index].to_path_canonicalize()
     }
 
-    pub fn drop_invalid_folder(&mut self, index: usize) {
+    pub fn drop_invalid_folder(&mut self, index: usize) -> AppResult<()> {
         assert!(self.state_holder.borrow().is_history_search());
         let removed = self.selected_path_holder.remove(index);
         self.cache_holder
             .pop(&removed.to_path())
-            .expect("Must contain the invalid path in cache");
+            .ok_or(AppError::Cache(
+                "Must contain the invalid path in cache".into(),
+            ))?;
+        Ok(())
     }
 
     pub fn peek(&self) -> AppResult<&FileGroupHolder> {
