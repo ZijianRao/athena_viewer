@@ -166,14 +166,17 @@ impl MessageHolder {
         Ok(())
     }
 
-    pub fn draw(&mut self, area: Rect, frame: &mut Frame) {
+    pub fn draw(&mut self, area: Rect, frame: &mut Frame) -> AppResult<()> {
         match self.file_opened.clone() {
             None => self.draw_folder_view(area, frame),
-            Some(file_path) => self.draw_file_view(area, frame, &file_path),
+            Some(file_path) => {
+                self.draw_file_view(area, frame, &file_path);
+                Ok(())
+            }
         }
     }
 
-    fn draw_folder_view(&mut self, area: Rect, frame: &mut Frame) {
+    fn draw_folder_view(&mut self, area: Rect, frame: &mut Frame) -> AppResult<()> {
         let mut path_holder: Vec<ListItem> = self
             .folder_holder
             .selected_path_holder
@@ -189,7 +192,7 @@ impl MessageHolder {
             })
             .collect();
         if path_holder.is_empty() {
-            return;
+            return Ok(());
         }
 
         let highlight_index = self.get_highlight_index(path_holder.len());
@@ -204,7 +207,7 @@ impl MessageHolder {
                 .title(self.folder_holder.current_directory.display().to_string())
                 .title_bottom(
                     self.folder_holder
-                        .peek()
+                        .peek()?
                         .update_time
                         .format("%Y-%m-%d %H:%M:%S")
                         .to_string(),
@@ -213,13 +216,14 @@ impl MessageHolder {
 
         let messages = List::new(path_holder).block(block);
         frame.render_widget(messages, area);
+        Ok(())
     }
 
-    fn get_text(&self, entry: &FileHolder) -> Result<String, std::io::Error> {
+    fn get_text(&self, entry: &FileHolder) -> AppResult<String> {
         if self.state_holder.borrow().is_history_search() {
             Ok(entry.to_path_canonicalize()?.to_string_lossy().into_owned())
         } else {
-            Ok(entry.relative_to(&self.folder_holder.current_directory))
+            entry.relative_to(&self.folder_holder.current_directory)
         }
     }
 

@@ -86,19 +86,21 @@ impl FolderHolder {
         let mut selected_path_ref: HashSet<PathBuf> = HashSet::new();
 
         for item in self.current_holder.iter().skip(1) {
-            let result = item.relative_to(&self.current_directory);
+            let result = item.relative_to(&self.current_directory)?;
             let current_level = result.matches('/').count();
 
             let key = if current_level > self.expand_level {
                 item.parent
                     .canonicalize()
-                    .expect("Cannot canonicalize?")
+                    .map_err(|_| {
+                        AppError::Parse(format!(
+                            "Unable to get parent of {}",
+                            item.parent.to_string_lossy()
+                        ))
+                    })?
                     .clone()
             } else {
-                item.to_path_canonicalize()
-                    .expect("Expect to have valid path")
-                    .canonicalize()
-                    .expect("Cannot canonicalize?")
+                item.to_path_canonicalize()?
             };
 
             if !selected_path_ref.contains(&key) {
@@ -124,8 +126,8 @@ impl FolderHolder {
             self.input = value;
         }
 
+        let mut selected_path_holder = Vec::new();
         if self.state_holder.borrow().is_history_search() {
-            let mut selected_path_holder = Vec::new();
             for (path, _) in &self.cache_holder {
                 if let Some(path_str) = path.to_str() {
                     if self.should_select(path_str) {
@@ -134,15 +136,14 @@ impl FolderHolder {
                     }
                 }
             }
-            self.selected_path_holder = selected_path_holder;
         } else {
-            self.selected_path_holder = self
-                .current_holder
-                .clone()
-                .into_iter()
-                .filter(|entry| self.should_select(&entry.relative_to(&self.current_directory)))
-                .collect();
+            for file_holder in &self.current_holder {
+                if self.should_select(&file_holder.relative_to(&self.current_directory)?) {
+                    selected_path_holder.push(file_holder.clone());
+                }
+            }
         }
+        self.selected_path_holder = selected_path_holder;
 
         Ok(())
     }
@@ -207,7 +208,7 @@ impl FolderHolder {
         next_to_match.is_none()
     }
 
-    pub fn submit(&mut self, index: usize) -> Result<PathBuf, std::io::Error> {
+    pub fn submit(&mut self, index: usize) -> AppResult<PathBuf> {
         self.selected_path_holder[index].to_path_canonicalize()
     }
 
@@ -219,9 +220,12 @@ impl FolderHolder {
             .expect("Must contain the invalid path in cache");
     }
 
-    pub fn peek(&self) -> &FileGroupHolder {
+    pub fn peek(&self) -> AppResult<&FileGroupHolder> {
         self.cache_holder
             .peek(&self.current_directory)
-            .unwrap_or_else(|| panic!("Unable to get cache for {:?}", self.current_directory))
+            .ok_or(AppError::Cache(format!(
+                "Unable to get cache for {:?}",
+                self.current_directory
+            )))
     }
 }

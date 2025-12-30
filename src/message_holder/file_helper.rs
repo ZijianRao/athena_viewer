@@ -78,27 +78,30 @@ impl TryFrom<PathBuf> for FileHolder {
 }
 
 impl FileHolder {
-    pub fn to_path_canonicalize(&self) -> Result<PathBuf, std::io::Error> {
-        self.to_path().canonicalize()
+    pub fn to_path_canonicalize(&self) -> AppResult<PathBuf> {
+        let path = self.to_path();
+        path.canonicalize().map_err(|_| {
+            AppError::Path(format!("Unable to canonicalize {}", path.to_string_lossy()))
+        })
     }
 
     pub fn to_path(&self) -> PathBuf {
         self.parent.join(self.file_name.clone())
     }
 
-    pub fn relative_to(&self, ref_path: &PathBuf) -> String {
-        let rel_path = self.parent.strip_prefix(ref_path).unwrap_or_else(|_| {
-            panic!(
+    pub fn relative_to(&self, ref_path: &PathBuf) -> AppResult<String> {
+        let rel_path = self.parent.strip_prefix(ref_path).map_err(|_| {
+            AppError::Path(format!(
                 "Can not get path prefix from {} for {}",
                 self.parent.to_string_lossy(),
                 ref_path.to_string_lossy()
-            )
-        });
+            ))
+        })?;
         let prefix = rel_path.to_string_lossy();
         if prefix.is_empty() {
-            self.file_name.clone()
+            Ok(self.file_name.clone())
         } else {
-            format!("{}/{}", prefix, self.file_name)
+            Ok(format!("{}/{}", prefix, self.file_name))
         }
     }
 }
@@ -121,11 +124,9 @@ impl FileGroupHolder {
         let read_dir_result = fs::read_dir(&path)
             .map_err(|_| AppError::Parse(format!("Unable to read {}", path.to_string_lossy())))?;
 
-        for entry in read_dir_result {
-            if let Ok(e) = entry {
-                let file_holder = FileHolder::try_from(e.path())?;
-                entries.push(file_holder);
-            }
+        for entry in read_dir_result.flatten() {
+            let file_holder = FileHolder::try_from(entry.path())?;
+            entries.push(file_holder);
         }
 
         entries.sort_by_key(|f| f.file_name.clone());

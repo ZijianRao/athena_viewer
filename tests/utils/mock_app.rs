@@ -118,7 +118,9 @@ impl TestApp {
                         .to_string_lossy()
                         .into_owned()
                 } else {
-                    entry.relative_to(&self.app.message_holder.folder_holder.current_directory)
+                    entry
+                        .relative_to(&self.app.message_holder.folder_holder.current_directory)
+                        .unwrap()
                 }
             })
             .collect()
@@ -133,6 +135,8 @@ impl TestApp {
 
     /// render the current frame (useful for debugging)
     pub fn render_frame(&mut self) {
-        let _ = self.terminal.draw(|frame| self.app.draw(frame));
+        self.terminal
+            .draw(|frame| self.app.draw(frame).unwrap())
+            .unwrap();
     }
 }

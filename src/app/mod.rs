@@ -13,6 +13,7 @@ use std::time::Duration;
 use std::time::Instant;
 use tui_input::Input;
 
+use crate::app::app_error::AppResult;
 use crate::message_holder::MessageHolder;
 use crate::state_holder::{InputMode, StateHolder, ViewMode};
 pub mod app_error;
@@ -49,11 +50,10 @@ impl App {
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> app_error::AppResult<()> {
         loop {
-            terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|frame| self.draw(frame).expect("Unexpected!"))?;
             let result = self.handle_event();
-            match result {
-                Err(err) => self.handle_error(err),
-                _ => (),
+            if let Err(err) = result {
+                self.handle_error(err)
             }
             if self.exit {
                 return Ok(());
@@ -63,12 +63,11 @@ impl App {
     fn handle_error(&mut self, error: app_error::AppError) {
         use app_error::AppError::*;
         self.log_message = error.to_string();
-        match error {
-            Terminal(_) => self.exit = true,
-            _ => (),
+        if let Terminal(_) = error {
+            self.exit = true;
         }
     }
-    pub fn draw(&mut self, frame: &mut Frame) {
+    pub fn draw(&mut self, frame: &mut Frame) -> AppResult<()> {
         use InputMode::*;
         use ViewMode::*;
         let vertical = Layout::vertical([
@@ -90,8 +89,10 @@ impl App {
             _ => (),
         }
         self.draw_input_area(input_area, frame);
-        self.message_holder.draw(messages_area, frame);
+        self.message_holder.draw(messages_area, frame)?;
         self.draw_log_area(log_area, frame);
+
+        Ok(())
     }
 
     pub fn draw_input_area(&self, area: Rect, frame: &mut Frame) {
