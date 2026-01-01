@@ -91,4 +91,55 @@ mod navigation_tests {
         app.send_event(events::ctrl_k()).unwrap();
         assert_eq!(app.get_current_directory(), fs.path());
     }
+
+    #[test]
+    fn test_browse_directory_permission_error() {
+        use athena_viewer::app::app_error::AppError;
+        use std::fs;
+        use std::os::unix::fs::PermissionsExt;
+        // setup: create test filesystem
+        let fs = TestFileSystem::new();
+        fs.create_nested_structure();
+        let no_permission_folder_name = "no_permission";
+        let no_permission_path = fs.create_dir(no_permission_folder_name);
+        fs::set_permissions(
+            no_permission_path.clone(),
+            fs::Permissions::from_mode(0o111),
+        )
+        .unwrap();
+
+        // create app in test directory
+        let mut app = TestApp::new(fs.path().to_path_buf()).unwrap();
+        assert_eq!(app.get_current_directory(), fs.path());
+
+        // verify initial state
+        assert!(app.is_edit_mode());
+        assert!(app.is_search_view());
+
+        let mut visible_items = vec![
+            "..",
+            "README.md",
+            "main.rs",
+            "src",
+            "empty",
+            ".gitkeep",
+            no_permission_folder_name,
+        ];
+        visible_items.sort();
+
+        assert_eq!(app.get_visible_items(), visible_items);
+        // navigate down to and enter 'src/' directory
+        let result = app.send_events(vec![
+            events::char('n'),
+            events::char('o'),
+            events::char('_'),
+            events::char('p'),
+            events::enter(),
+        ]);
+        if let Err(e) = result {
+            assert!(matches!(e, AppError::Parse(_)));
+        }
+        fs::set_permissions(no_permission_path, fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(app.get_current_directory(), fs.path().to_path_buf());
+    }
 }
