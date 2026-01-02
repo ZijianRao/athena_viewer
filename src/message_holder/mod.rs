@@ -124,10 +124,14 @@ impl MessageHolder {
     }
 
     fn get_highlight_index(&self, group_len: usize) -> AppResult<usize> {
+        Self::get_highlight_index_helper(self.raw_highlight_index, group_len)
+    }
+
+    fn get_highlight_index_helper(raw_highlight_index: i32, group_len: usize) -> AppResult<usize> {
         let divisor: i32 = group_len
             .try_into()
             .map_err(|_| AppError::Parse("Cannot convert group len of path_group".into()))?;
-        let remainder = self.raw_highlight_index.rem_euclid(divisor);
+        let remainder = raw_highlight_index.rem_euclid(divisor);
         let out: usize = remainder
             .try_into()
             .map_err(|_| AppError::Parse("Cannot convert group len of path_group".into()))?;
@@ -254,5 +258,34 @@ impl MessageHolder {
             &mut self.horizontal_scroll_state,
         );
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_get_highlight_index_helper_common() {
+        let act = MessageHolder::get_highlight_index_helper(1, 10).unwrap();
+        let exp = 1;
+        assert_eq!(act, exp);
+
+        let act = MessageHolder::get_highlight_index_helper(0, 100).unwrap();
+        let exp = 0;
+        assert_eq!(act, exp);
+    }
+
+    #[test]
+    fn test_get_highlight_index_helper_neg() {
+        let act = MessageHolder::get_highlight_index_helper(-1, 10).unwrap();
+        let exp = 9;
+        assert_eq!(act, exp);
+    }
+
+    #[test]
+    fn test_get_highlight_index_helper_large() {
+        let act = MessageHolder::get_highlight_index_helper(5, 3).unwrap();
+        let exp = 2;
+        assert_eq!(act, exp);
     }
 }
