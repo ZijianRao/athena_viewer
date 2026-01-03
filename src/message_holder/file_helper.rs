@@ -2,10 +2,11 @@ use std::fs::{self};
 
 use chrono::{DateTime, Local};
 use ratatui::text::Line;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::app::app_error::{AppError, AppResult};
 use crate::message_holder::code_highlighter::CodeHighlighter;
+const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB
 
 #[derive(Debug)]
 pub struct FileTextInfo {
@@ -28,7 +29,11 @@ pub struct FileGroupHolder {
 }
 
 impl FileTextInfo {
-    pub fn new(value: &PathBuf, code_highlighter: &CodeHighlighter) -> AppResult<Self> {
+    pub fn new(value: &Path, code_highlighter: &CodeHighlighter) -> AppResult<Self> {
+        let meta_data = fs::metadata(value).map_err(|e| AppError::Io(e))?;
+        if meta_data.len() > MAX_FILE_SIZE {
+            return Err(AppError::Path("File too large".into()));
+        }
         let content = match fs::read_to_string(value) {
             Ok(text) => text,
             Err(_) => "Unable to read...".to_string(),
@@ -144,28 +149,27 @@ mod tests {
     use tempfile::NamedTempFile;
 
     #[test]
-    fn test_file_holder() -> Result<(), Box<dyn std::error::Error>> {
-        let path = get_temp_file()?;
-        let _ = FileHolder::try_from(path).unwrap();
-        Ok(())
+    fn test_file_holder() {
+        let temp_file = get_temp_file();
+        let path = temp_file.path();
+        let _ = FileHolder::try_from(path.to_path_buf()).unwrap();
     }
 
     #[test]
-    fn test_file_text_info() -> Result<(), Box<dyn std::error::Error>> {
-        let path = get_temp_file()?;
+    fn test_file_text_info() {
+        let temp_file = get_temp_file();
+        let path = temp_file.path();
         let code_highlighter = CodeHighlighter::default();
         let file_text_info = FileTextInfo::new(&path, &code_highlighter).unwrap();
         assert_eq!(file_text_info.n_rows, 1);
-        assert_eq!(file_text_info.max_line_length, 17);
-        Ok(())
+        assert_eq!(file_text_info.max_line_length, 13);
     }
 
-    fn get_temp_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
-        let temp_file = NamedTempFile::new()?;
+    fn get_temp_file() -> NamedTempFile {
+        let temp_file = NamedTempFile::new().unwrap();
 
-        let mut file = temp_file.reopen()?;
-        file.write_all(b"Hello, world!")?;
-
-        Ok(temp_file.path().to_path_buf())
+        let mut file = temp_file.reopen().unwrap();
+        file.write_all(b"Hello, world!").unwrap();
+        temp_file
     }
 }

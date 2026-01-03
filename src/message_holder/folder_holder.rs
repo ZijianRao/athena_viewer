@@ -187,12 +187,16 @@ impl FolderHolder {
     }
 
     fn should_select(&self, name: &str) -> bool {
-        if self.input.is_empty() {
+        Self::should_select_helper(name, &self.input)
+    }
+
+    fn should_select_helper(name: &str, input: &str) -> bool {
+        if input.is_empty() {
             return true;
         }
 
-        // check if all charactoer in self.input appear in order (case-insensitive) in name
-        let mut input_iter = self.input.chars();
+        // check if all characters in self.input appear in order (case-insensitive) in name
+        let mut input_iter = input.chars();
         let mut next_to_match = input_iter.next();
 
         for name_char in name.chars() {
@@ -230,5 +234,18 @@ impl FolderHolder {
                 "Unable to get cache for {:?}",
                 self.current_directory
             )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_should_select() {
+        assert!(FolderHolder::should_select_helper("abc", "c"));
+        assert!(FolderHolder::should_select_helper("abc", ""));
+        assert!(!FolderHolder::should_select_helper("abc", "d"));
+        assert!(!FolderHolder::should_select_helper("abc", "abcd"));
     }
 }
