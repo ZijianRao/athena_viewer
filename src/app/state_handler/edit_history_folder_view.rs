@@ -1,3 +1,7 @@
+//! Event handling and rendering for Edit+HistoryFolderView mode
+//!
+//! This mode allows typing search queries for cached directory history.
+
 use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::{
     layout::Rect,

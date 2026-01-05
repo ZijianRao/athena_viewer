@@ -9,11 +9,23 @@ use crate::app::app_error::{AppError, AppResult};
 use crate::message_holder::file_helper::{FileGroupHolder, FileHolder};
 use crate::state_holder::StateHolder;
 
-const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(100) {
+/// Default LRU cache size for directory listings
+pub const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(100) {
     Some(size) => size,
     None => panic!("DEFAULT_CACHE_SIZE must be non-zero"),
 };
 
+/// Manages directory navigation, search filtering, and caching
+///
+/// # Fields
+///
+/// - `state_holder`: Shared state machine reference
+/// - `cache_holder`: LRU cache of directory listings
+/// - `input`: Current search filter string
+/// - `selected_path_holder`: Filtered list of matching items
+/// - `current_directory`: Currently displayed directory
+/// - `current_holder`: All items in current directory
+/// - `expand_level`: Current expansion depth (for recursive expand)
 #[derive(Debug)]
 pub struct FolderHolder {
     state_holder: Rc<RefCell<StateHolder>>,
@@ -26,6 +38,18 @@ pub struct FolderHolder {
 }
 
 impl FolderHolder {
+    /// Creates a new FolderHolder for a given directory
+    ///
+    /// # Arguments
+    ///
+    /// * `current_directory` - Starting directory
+    /// * `state_holder` - Shared state machine reference
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<Self>` which may contain:
+    /// - `AppError::Parse`: If directory cannot be read
+    /// - `AppError::Path`: If path resolution fails
     pub fn new(
         current_directory: PathBuf,
         state_holder: Rc<RefCell<StateHolder>>,
@@ -46,6 +70,16 @@ impl FolderHolder {
         })
     }
 
+    /// Expands all directories recursively
+    ///
+    /// Reads all subdirectories and adds their contents to the current view.
+    /// Increments the expand level counter.
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain:
+    /// - `AppError::Path`: If path resolution fails
+    /// - `AppError::Parse`: If directory reading fails
     pub fn expand(&mut self) -> AppResult<()> {
         let first_item = self.current_holder[0].clone();
         let value_path_group: Vec<PathBuf> = self
@@ -74,6 +108,16 @@ impl FolderHolder {
         Ok(())
     }
 
+    /// Collapses expanded directories
+    ///
+    /// Reduces the view back to the previous expansion level.
+    /// Decrements the expand level counter.
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain:
+    /// - `AppError::Path`: If path resolution fails
+    /// - `AppError::State`: If already at base level
     pub fn collapse(&mut self) -> AppResult<()> {
         if self.expand_level == 0 {
             return Ok(());
@@ -114,6 +158,15 @@ impl FolderHolder {
         Ok(())
     }
 
+    /// Adds a directory to the cache
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Directory path to cache
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain `AppError::Parse` if directory cannot be read
     pub fn put(&mut self, path: &Path) -> AppResult<()> {
         let holder = FileGroupHolder::new(path.to_path_buf(), true)?;
         self.cache_holder.put(path.to_path_buf(), holder);
@@ -121,6 +174,15 @@ impl FolderHolder {
         Ok(())
     }
 
+    /// Updates the filtered selection based on search input
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - Optional search filter string
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain `AppError::Path` if path resolution fails
     pub fn update(&mut self, input: Option<String>) -> AppResult<()> {
         if let Some(value) = input {
             self.input = value;
@@ -148,6 +210,17 @@ impl FolderHolder {
         Ok(())
     }
 
+    /// Changes to a new working directory
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - New directory path
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain:
+    /// - `AppError::Cache`: If cache lookup fails
+    /// - `AppError::Path`: If path resolution fails
     pub fn submit_new_working_directory(&mut self, path: PathBuf) -> AppResult<()> {
         if self.cache_holder.get(&path).is_none() {
             self.put(&path)?
@@ -171,6 +244,15 @@ impl FolderHolder {
         Ok(())
     }
 
+    /// Refreshes the current directory cache
+    ///
+    /// Re-reads the current directory and updates the cache
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain:
+    /// - `AppError::Parse`: If directory cannot be read
+    /// - `AppError::Cache`: If cache update fails
     pub fn refresh(&mut self) -> AppResult<()> {
         let holder = FileGroupHolder::new(self.current_directory.clone(), true)?;
         self.current_holder = holder.child.clone();
@@ -186,10 +268,14 @@ impl FolderHolder {
         Ok(())
     }
 
+    /// Checks if an item matches the current filter
     fn should_select(&self, name: &str) -> bool {
         Self::should_select_helper(name, &self.input)
     }
 
+    /// Helper function for substring matching (case-insensitive)
+    ///
+    /// Checks if all characters in `input` appear in order in `name`
     fn should_select_helper(name: &str, input: &str) -> bool {
         if input.is_empty() {
             return true;
@@ -212,10 +298,33 @@ impl FolderHolder {
         next_to_match.is_none()
     }
 
+    /// Submits a selection and returns the canonicalized path
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - Index in the selected_path_holder
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<PathBuf>` which may contain `AppError::Path` if
+    /// the path cannot be canonicalized
     pub fn submit(&mut self, index: usize) -> AppResult<PathBuf> {
         self.selected_path_holder[index].to_path_canonicalize()
     }
 
+    /// Removes an invalid folder from the history and cache
+    ///
+    /// Only works in history search mode
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - Index of the invalid folder to remove
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain:
+    /// - `AppError::State`: If not in history mode
+    /// - `AppError::Cache`: If folder not found in cache
     pub fn drop_invalid_folder(&mut self, index: usize) -> AppResult<()> {
         if !self.state_holder.borrow().is_history_search() {
             return Err(AppError::State("Must be in history mode".into()));
@@ -229,6 +338,12 @@ impl FolderHolder {
         Ok(())
     }
 
+    /// Peeks at the current directory's cached information
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<&FileGroupHolder>` which may contain `AppError::Cache`
+    /// if the current directory is not in cache
     pub fn peek(&self) -> AppResult<&FileGroupHolder> {
         self.cache_holder
             .peek(&self.current_directory)

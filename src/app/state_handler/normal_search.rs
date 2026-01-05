@@ -1,3 +1,7 @@
+//! Event handling and rendering for Normal+Search mode
+//!
+//! This mode allows keyboard navigation through directories with search filtering.
+
 use ratatui::crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
     layout::Rect,

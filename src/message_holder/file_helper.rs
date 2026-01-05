@@ -6,8 +6,17 @@ use std::path::{Path, PathBuf};
 
 use crate::app::app_error::{AppError, AppResult};
 use crate::message_holder::code_highlighter::CodeHighlighter;
-const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB
 
+/// Maximum file size allowed for viewing (10MB)
+pub const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
+
+/// Holds formatted file content and metadata for display
+///
+/// # Fields
+///
+/// - `n_rows`: Number of lines in the file
+/// - `max_line_length`: Length of the longest line
+/// - `formatted_text`: Syntax-highlighted lines ready for display
 #[derive(Debug)]
 pub struct FileTextInfo {
     pub n_rows: usize,
@@ -15,6 +24,13 @@ pub struct FileTextInfo {
     pub formatted_text: Vec<Line<'static>>,
 }
 
+/// Represents a file or directory entry
+///
+/// # Fields
+///
+/// - `parent`: Parent directory path
+/// - `file_name`: Name of the file/directory
+/// - `is_file`: True if this is a file, false if directory
 #[derive(Debug, Clone)]
 pub struct FileHolder {
     pub parent: PathBuf,
@@ -22,6 +38,12 @@ pub struct FileHolder {
     pub is_file: bool,
 }
 
+/// Holds a group of files/directories with metadata
+///
+/// # Fields
+///
+/// - `child`: List of file/directory entries
+/// - `update_time`: When this group was last updated
 #[derive(Debug)]
 pub struct FileGroupHolder {
     pub child: Vec<FileHolder>,
@@ -29,6 +51,19 @@ pub struct FileGroupHolder {
 }
 
 impl FileTextInfo {
+    /// Creates a new FileTextInfo by loading and highlighting a file
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Path to the file to load
+    /// * `code_highlighter` - Syntax highlighter for formatting
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<Self>` which may contain:
+    /// - `AppError::Io`: If file cannot be read
+    /// - `AppError::Path`: If file is too large (> 10MB)
+    /// - `AppError::Parse`: If syntax highlighting fails
     pub fn new(value: &Path, code_highlighter: &CodeHighlighter) -> AppResult<Self> {
         let meta_data = fs::metadata(value).map_err(|e| AppError::Io(e))?;
         if meta_data.len() > MAX_FILE_SIZE {
@@ -58,6 +93,18 @@ impl FileTextInfo {
 
 impl TryFrom<PathBuf> for FileHolder {
     type Error = AppError;
+
+    /// Converts a PathBuf to a FileHolder
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to convert
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<Self>` which may contain `AppError::Path` if:
+    /// - The path has no file name
+    /// - The path has no parent directory
     fn try_from(path: PathBuf) -> AppResult<Self> {
         let file_name = path
             .file_name()
@@ -83,6 +130,12 @@ impl TryFrom<PathBuf> for FileHolder {
 }
 
 impl FileHolder {
+    /// Returns the canonicalized absolute path of this file/directory
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<PathBuf>` which may contain `AppError::Path` if
+    /// the path cannot be canonicalized (e.g., doesn't exist)
     pub fn to_path_canonicalize(&self) -> AppResult<PathBuf> {
         let path = self.to_path();
         path.canonicalize().map_err(|_| {
@@ -90,10 +143,21 @@ impl FileHolder {
         })
     }
 
+    /// Constructs the full path from parent and file name
     pub fn to_path(&self) -> PathBuf {
         self.parent.join(self.file_name.clone())
     }
 
+    /// Returns the path relative to a reference directory
+    ///
+    /// # Arguments
+    ///
+    /// * `ref_path` - The reference directory path
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<String>` which may contain `AppError::Path` if
+    /// the reference path is not a prefix of this file's path
     pub fn relative_to(&self, ref_path: &PathBuf) -> AppResult<String> {
         let rel_path = self.parent.strip_prefix(ref_path).map_err(|_| {
             AppError::Path(format!(
@@ -112,6 +176,18 @@ impl FileHolder {
 }
 
 impl FileGroupHolder {
+    /// Creates a new FileGroupHolder by reading a directory
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The directory path to read
+    /// * `adding_parent_shortcut` - If true, adds ".." entry for parent navigation
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<Self>` which may contain:
+    /// - `AppError::Parse`: If the directory cannot be read
+    /// - `AppError::Path`: If individual entries cannot be processed
     pub fn new(path: PathBuf, adding_parent_shortcut: bool) -> AppResult<Self> {
         let mut entries = Vec::new();
 

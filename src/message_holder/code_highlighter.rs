@@ -9,6 +9,12 @@ use syntect::{
 
 use crate::app::app_error::{AppError, AppResult};
 
+/// Syntax highlighter for code files using syntect
+///
+/// # Fields
+///
+/// - `syntax_set`: Set of syntax definitions for various languages
+/// - `theme`: Color theme for highlighting (base16-ocean.dark)
 #[derive(Debug)]
 pub struct CodeHighlighter {
     syntax_set: SyntaxSet,
@@ -26,6 +32,16 @@ impl Default for CodeHighlighter {
 }
 
 impl CodeHighlighter {
+    /// Gets the appropriate syntax for a file based on its extension
+    ///
+    /// # Arguments
+    ///
+    /// * `file_path` - Path to the file
+    ///
+    /// # Returns
+    ///
+    /// Returns the syntax reference for the file type, or plain text syntax
+    /// as a fallback
     fn get_syntax(&self, file_path: &Path) -> &SyntaxReference {
         file_path
             .extension()
@@ -34,6 +50,17 @@ impl CodeHighlighter {
             .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
     }
 
+    /// Applies syntax highlighting to code
+    ///
+    /// # Arguments
+    ///
+    /// * `code` - The source code to highlight
+    /// * `syntax` - The syntax definition to use
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<Vec<Line<'static>>>` which may contain `AppError::Parse`
+    /// if highlighting fails
     fn get_highlighted_code(
         &self,
         code: &str,
@@ -64,6 +91,17 @@ impl CodeHighlighter {
         Ok(lines)
     }
 
+    /// Highlights a code string for a specific file
+    ///
+    /// # Arguments
+    ///
+    /// * `code` - The source code to highlight
+    /// * `file_path` - Path to determine the language syntax
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<Vec<Line<'static>>>` which may contain:
+    /// - `AppError::Parse`: If syntax highlighting fails
     pub fn highlight(&self, code: &str, file_path: &Path) -> AppResult<Vec<Line<'static>>> {
         let syntax = self.get_syntax(file_path);
         self.get_highlighted_code(code, syntax)

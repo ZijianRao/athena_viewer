@@ -1,3 +1,7 @@
+//! Event handling and rendering for Edit+Search mode
+//!
+//! This mode allows typing search/filter queries for directory browsing.
+
 use ratatui::crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
     layout::Rect,

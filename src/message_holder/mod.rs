@@ -1,3 +1,19 @@
+//! File viewing, directory navigation, and message display
+//!
+//! This module handles:
+//! - Loading and displaying files with syntax highlighting
+//! - Directory navigation and search filtering
+//! - File/folder caching for performance
+//! - Scroll state management
+//!
+//! # Core Types
+//!
+//! - [`MessageHolder`]: Main controller for file/directory operations
+//! - [`FolderHolder`]: Directory navigation and caching
+//! - [`FileHolder`]: Individual file/folder metadata
+//! - [`FileTextInfo`]: File content with formatting
+//! - [`CodeHighlighter`]: Syntax highlighting using syntect
+
 pub mod code_highlighter;
 pub mod file_helper;
 pub mod folder_holder;
@@ -23,6 +39,23 @@ use crate::message_holder::file_helper::{FileHolder, FileTextInfo};
 use crate::message_holder::folder_holder::FolderHolder;
 use crate::state_holder::StateHolder;
 
+/// Main controller for file viewing and directory navigation
+///
+/// Coordinates between the UI, file system operations, and state management.
+/// Handles file loading, directory browsing, search filtering, and rendering.
+///
+/// # Fields
+///
+/// - `state_holder`: Shared state machine reference
+/// - `folder_holder`: Directory navigation and caching
+/// - `code_highlighter`: Syntax highlighting engine
+/// - `raw_highlight_index`: Current selection index (before wrapping)
+/// - `file_opened`: Currently open file path (if any)
+/// - `file_text_info`: Loaded file content and metadata (if file open)
+/// - `vertical_scroll_state`: Scrollbar state for vertical scrolling
+/// - `horizontal_scroll_state`: Scrollbar state for horizontal scrolling
+/// - `vertical_scroll`: Current vertical scroll position
+/// - `horizontal_scroll`: Current horizontal scroll position
 #[derive(Debug)]
 pub struct MessageHolder {
     state_holder: Rc<RefCell<StateHolder>>,
@@ -38,6 +71,19 @@ pub struct MessageHolder {
 }
 
 impl MessageHolder {
+    /// Creates a new MessageHolder instance
+    ///
+    /// # Arguments
+    ///
+    /// * `current_directory` - Starting directory for navigation
+    /// * `state_holder` - Shared state machine reference
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<Self>` which may contain:
+    /// - `AppError::Io`: If directory cannot be read
+    /// - `AppError::Path`: If path resolution fails
+    /// - `AppError::Cache`: If cache initialization fails
     pub fn new(
         current_directory: PathBuf,
         state_holder: Rc<RefCell<StateHolder>>,
@@ -57,29 +103,69 @@ impl MessageHolder {
         })
     }
 
+    /// Resets the selection index to 0
     pub fn reset_index(&mut self) {
         self.raw_highlight_index = 0;
     }
+
+    /// Moves the selection up by one item
+    ///
+    /// Uses saturating subtraction to prevent underflow
     pub fn move_up(&mut self) {
         self.raw_highlight_index = self.raw_highlight_index.saturating_sub(1);
     }
+
+    /// Moves the selection down by one item
+    ///
+    /// Uses saturating addition to prevent overflow
     pub fn move_down(&mut self) {
         self.raw_highlight_index = self.raw_highlight_index.saturating_add(1);
     }
+
+    /// Updates the filtered view based on search input
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - Optional search filter string
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain `AppError::State` if update fails
     pub fn update(&mut self, input: Option<String>) -> AppResult<()> {
         self.folder_holder.update(input)?;
         self.reset_index();
         Ok(())
     }
+
+    /// Expands all directories recursively
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain:
+    /// - `AppError::Io`: If directory reading fails
+    /// - `AppError::Path`: If path resolution fails
     pub fn expand(&mut self) -> AppResult<()> {
         self.folder_holder.expand()?;
         Ok(())
     }
+
+    /// Collapses expanded directories
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain `AppError::State` on invalid state
     pub fn collapse(&mut self) -> AppResult<()> {
         self.folder_holder.collapse()?;
         Ok(())
     }
 
+    /// Navigates to the parent directory
+    ///
+    /// Resets the selection index and refreshes the view
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain directory navigation errors
     pub fn to_parent(&mut self) -> AppResult<()> {
         self.raw_highlight_index = 0;
         self.update(Some("".into()))?;
@@ -87,6 +173,13 @@ impl MessageHolder {
         Ok(())
     }
 
+    /// Deletes the currently selected file or directory
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain:
+    /// - `AppError::Path`: If path resolution fails
+    /// - `AppError::State`: If selection is invalid
     pub fn delete(&mut self) -> AppResult<()> {
         let path_holder = &self.folder_holder.selected_path_holder;
         if path_holder.is_empty() {
@@ -105,11 +198,23 @@ impl MessageHolder {
         Ok(())
     }
 
+    /// Refreshes the current folder's cache
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain `AppError::Cache` or `AppError::Io`
     pub fn refresh_current_folder_cache(&mut self) -> AppResult<()> {
         self.folder_holder.refresh()?;
         Ok(())
     }
 
+    /// Resets the message holder to initial state
+    ///
+    /// Clears input, resets file view, and resets selection index
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain directory update errors
     pub fn reset(&mut self) -> AppResult<()> {
         self.folder_holder.input.clear();
         self.folder_holder.update(None)?;
@@ -118,15 +223,30 @@ impl MessageHolder {
         Ok(())
     }
 
+    /// Resets the file view state
+    ///
+    /// Clears the currently opened file and its text info
     pub fn reset_file_view(&mut self) {
         self.file_opened = None;
         self.file_text_info = None;
     }
 
+    /// Converts raw highlight index to wrapped index within bounds
+    ///
+    /// # Arguments
+    ///
+    /// * `group_len` - The number of items in the current selection
+    ///
+    /// # Returns
+    ///
+    /// Returns the wrapped index or `AppError::Parse` if conversion fails
     fn get_highlight_index(&self, group_len: usize) -> AppResult<usize> {
         Self::get_highlight_index_helper(self.raw_highlight_index, group_len)
     }
 
+    /// Helper function for index wrapping with Euclidean division
+    ///
+    /// Handles negative indices by wrapping around using modulo arithmetic
     fn get_highlight_index_helper(raw_highlight_index: i32, group_len: usize) -> AppResult<usize> {
         let divisor: i32 = group_len
             .try_into()
@@ -138,6 +258,14 @@ impl MessageHolder {
         Ok(out)
     }
 
+    /// Submits the current selection (navigates into directory or opens file)
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain:
+    /// - `AppError::Path`: If path resolution fails
+    /// - `AppError::Parse`: If file parsing fails
+    /// - `AppError::Cache`: If cache operations fail
     pub fn submit(&mut self) -> AppResult<()> {
         let path_holder = &self.folder_holder.selected_path_holder;
         if path_holder.is_empty() {
@@ -173,6 +301,16 @@ impl MessageHolder {
         Ok(())
     }
 
+    /// Renders the current view to the terminal
+    ///
+    /// # Arguments
+    ///
+    /// * `area` - The rectangular area to render in
+    /// * `frame` - The ratatui frame to render to
+    ///
+    /// # Returns
+    ///
+    /// Returns `AppResult<()>` which may contain rendering errors
     pub fn draw(&mut self, area: Rect, frame: &mut Frame) -> AppResult<()> {
         match self.file_opened.clone() {
             None => self.draw_folder_view(area, frame),

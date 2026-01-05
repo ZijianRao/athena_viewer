@@ -1,3 +1,7 @@
+//! Event handling and rendering for Normal+FileView mode
+//!
+//! This mode allows viewing file contents with scrolling.
+
 use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::{
     layout::Rect,
