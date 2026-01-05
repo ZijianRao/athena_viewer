@@ -90,6 +90,21 @@ mod navigation_tests {
         assert!(app.is_normal_mode());
         app.send_event(events::ctrl_k()).unwrap();
         assert_eq!(app.get_current_directory(), fs.path());
+
+        // test when the folder list is filtered case
+        app.send_event(events::tab()).unwrap();
+        assert!(app.is_edit_mode());
+        app.send_events(vec![
+            events::char('s'),
+            events::char('r'),
+            events::char('c'),
+            events::enter(),
+            events::char('l'),
+        ])
+        .unwrap();
+        app.send_events(vec![events::tab(), events::ctrl_k()])
+            .unwrap();
+        assert_eq!(app.get_current_directory(), fs.path());
     }
 
     #[test]

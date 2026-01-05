@@ -217,7 +217,9 @@ impl FolderHolder {
     }
 
     pub fn drop_invalid_folder(&mut self, index: usize) -> AppResult<()> {
-        assert!(self.state_holder.borrow().is_history_search());
+        if !self.state_holder.borrow().is_history_search() {
+            return Err(AppError::State("Must be in history mode".into()));
+        }
         let removed = self.selected_path_holder.remove(index);
         self.cache_holder
             .pop(&removed.to_path())

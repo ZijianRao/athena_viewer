@@ -82,7 +82,7 @@ impl MessageHolder {
 
     pub fn to_parent(&mut self) -> AppResult<()> {
         self.raw_highlight_index = 0;
-        self.update(None)?;
+        self.update(Some("".into()))?;
         self.submit()?;
         Ok(())
     }
