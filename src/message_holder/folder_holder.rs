@@ -33,6 +33,7 @@ pub struct FolderHolder {
     pub input: String,
     pub selected_path_holder: Vec<FileHolder>,
     pub current_directory: PathBuf,
+    initial_directory: PathBuf,
     current_holder: Vec<FileHolder>,
     expand_level: usize,
 }
@@ -62,6 +63,7 @@ impl FolderHolder {
         Ok(FolderHolder {
             state_holder,
             cache_holder,
+            initial_directory: current_directory.clone(),
             current_directory,
             input: Default::default(),
             selected_path_holder: current_holder.clone(),
@@ -225,6 +227,14 @@ impl FolderHolder {
         if self.cache_holder.get(&path).is_none() {
             self.put(&path)?
         }
+        let is_valid_child = Self::is_child_path(self.initial_directory.as_path(), path.as_path())?;
+        if !is_valid_child {
+            return Err(AppError::Path(format!(
+                "Cannot goto {} as it is not child of {}",
+                path.display(),
+                self.initial_directory.display()
+            )));
+        }
 
         self.current_directory = path;
         let cache_result =
@@ -242,6 +252,17 @@ impl FolderHolder {
         self.expand_level = 0;
 
         Ok(())
+    }
+
+    fn is_child_path(parent: &Path, child: &Path) -> AppResult<bool> {
+        let parent = parent
+            .canonicalize()
+            .map_err(|_| AppError::Path(format!("Unable to canonicalize {}", parent.display())))?;
+        let child = child
+            .canonicalize()
+            .map_err(|_| AppError::Path(format!("Unable to canonicalize {}", child.display())))?;
+
+        Ok(child.starts_with(&parent))
     }
 
     /// Refreshes the current directory cache

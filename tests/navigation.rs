@@ -151,10 +151,29 @@ mod navigation_tests {
             events::char('p'),
             events::enter(),
         ]);
+        assert!(result.is_err());
         if let Err(e) = result {
             assert!(matches!(e, AppError::Parse(_)));
         }
         fs::set_permissions(no_permission_path, fs::Permissions::from_mode(0o755)).unwrap();
         assert_eq!(app.get_current_directory(), fs.path().to_path_buf());
+    }
+
+    #[test]
+    fn test_browse_directory_traveral_parent_check() {
+        use athena_viewer::app::app_error::AppError;
+
+        // setup: create test filesystem
+        let fs = TestFileSystem::new();
+        fs.create_nested_structure();
+
+        // create app in test directory
+        let mut app = TestApp::new(fs.path().to_path_buf()).unwrap();
+        assert_eq!(app.get_current_directory(), fs.path());
+        let result = app.send_events(vec![events::tab(), events::ctrl_k()]);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(matches!(e, AppError::Path(_)));
+        }
     }
 }
