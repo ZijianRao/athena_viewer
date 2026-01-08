@@ -229,6 +229,8 @@ impl MessageHolder {
     pub fn reset_file_view(&mut self) {
         self.file_opened = None;
         self.file_text_info = None;
+        self.vertical_scroll = 0;
+        self.horizontal_scroll = 0;
     }
 
     /// Converts raw highlight index to wrapped index within bounds

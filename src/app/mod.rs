@@ -53,6 +53,7 @@ pub struct App {
     pub timer: Instant,
     pub duration: Duration,
     pub log_message: String,
+    state_changed: bool,
 }
 
 impl App {
@@ -88,6 +89,7 @@ impl App {
             timer: Instant::now(),
             duration: Duration::default(),
             log_message: "".into(),
+            state_changed: true,
         })
     }
     /// Runs the main application loop
@@ -104,7 +106,10 @@ impl App {
     /// Returns `Ok(())` on clean exit or `AppError::Terminal` on terminal errors
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> app_error::AppResult<()> {
         loop {
-            terminal.draw(|frame| self.draw(frame).expect("Unexpected!"))?;
+            if self.state_changed {
+                terminal.draw(|frame| self.draw(frame).expect("Unexpected!"))?;
+                self.state_changed = false;
+            }
             let result = self.handle_event();
             if let Err(err) = result {
                 self.handle_error(err)
@@ -246,6 +251,7 @@ impl App {
             if let Event::Key(key_event) = &event {
                 self.mark_time();
                 is_key_press_event = true;
+                self.state_changed = true;
                 if let &KeyCode::Char('z') = &key_event.code {
                     if key_event.modifiers.contains(KeyModifiers::CONTROL) {
                         self.exit = true;

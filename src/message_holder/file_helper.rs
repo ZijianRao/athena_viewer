@@ -84,9 +84,25 @@ impl FileTextInfo {
     }
 
     fn get_string_dimensions(text: &str) -> (usize, usize) {
-        let lines: Vec<&str> = text.split('\n').collect();
-        let num_rows = lines.len();
-        let max_line_length = lines.iter().map(|line| line.len()).max().unwrap_or(0);
+        let mut num_rows = 0;
+        let mut max_line_length = 0;
+        let mut current_line_len = 0;
+        for byte in text.bytes() {
+            if byte == b'\n' {
+                num_rows += 1;
+                max_line_length = max_line_length.max(current_line_len);
+                current_line_len = 0;
+            } else {
+                current_line_len += 1;
+            }
+        }
+
+        // Handle last line
+        if !text.is_empty() {
+            num_rows += 1;
+            max_line_length = max_line_length.max(current_line_len);
+        }
+
         (num_rows, max_line_length)
     }
 }

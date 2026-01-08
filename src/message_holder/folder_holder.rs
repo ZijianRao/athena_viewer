@@ -56,7 +56,7 @@ impl FolderHolder {
         state_holder: Rc<RefCell<StateHolder>>,
     ) -> AppResult<Self> {
         let holder = FileGroupHolder::new(current_directory.clone(), true)?;
-        let current_holder: Vec<FileHolder> = holder.child.clone().into_iter().collect();
+        let current_holder: Vec<FileHolder> = holder.child.clone();
         let mut cache_holder = LruCache::new(DEFAULT_CACHE_SIZE);
         cache_holder.put(current_directory.clone(), holder);
 
