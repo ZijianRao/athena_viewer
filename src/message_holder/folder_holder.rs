@@ -10,7 +10,7 @@ use crate::message_holder::file_helper::{FileGroupHolder, FileHolder};
 use crate::state_holder::StateHolder;
 
 /// Default LRU cache size for directory listings
-pub const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(100) {
+pub const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(500) {
     Some(size) => size,
     None => panic!("DEFAULT_CACHE_SIZE must be non-zero"),
 };
@@ -92,6 +92,7 @@ impl FolderHolder {
             .collect();
 
         let mut result = Vec::new();
+        result.push(first_item);
         for p in &value_path_group {
             if p.is_dir() {
                 let group = FileGroupHolder::new(p.clone(), false)?;
@@ -102,7 +103,6 @@ impl FolderHolder {
             }
         }
 
-        result.insert(0, first_item);
         self.current_holder = result;
         self.update(None)?;
         self.expand_level = self.expand_level.saturating_add(1);
@@ -255,12 +255,14 @@ impl FolderHolder {
     }
 
     fn is_child_path(parent: &Path, child: &Path) -> AppResult<bool> {
-        let parent = parent
-            .canonicalize()
-            .map_err(|_| AppError::Path(format!("Unable to canonicalize {}", parent.display())))?;
-        let child = child
-            .canonicalize()
-            .map_err(|_| AppError::Path(format!("Unable to canonicalize {}", child.display())))?;
+        // let parent = parent
+        //     .canonicalize()
+        //     .map_err(|_| AppError::Path(format!("Unable to canonicalize {}", parent.display())))?;
+        // let child = child
+        //     .canonicalize()
+        //     .map_err(|_| AppError::Path(format!("Unable to canonicalize {}", child.display())))?;
+
+        // to support symbolic link case
 
         Ok(child.starts_with(&parent))
     }
