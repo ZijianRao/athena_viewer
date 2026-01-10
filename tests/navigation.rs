@@ -176,4 +176,35 @@ mod navigation_tests {
             assert!(matches!(e, AppError::Path(_)));
         }
     }
+
+    #[test]
+    fn test_folder_expand() {
+        // setup: create test filesystem
+        let fs = TestFileSystem::new();
+        fs.create_nested_structure();
+
+        // create app in test directory
+        let mut app = TestApp::new(fs.path().to_path_buf()).unwrap();
+        assert_eq!(app.get_current_directory(), fs.path());
+
+        app.send_event(events::tab()).unwrap();
+        assert!(app.is_normal_mode());
+        app.send_event(events::char('e')).unwrap();
+
+        let mut visible_items_exp = vec![
+            "..",
+            ".gitkeep",
+            "README.md",
+            "main.rs",
+            "src/lib.rs",
+            "src/module.rs",
+            "src/nested",
+        ];
+        visible_items_exp.sort();
+        let mut visible_items_act = app.get_visible_items();
+        visible_items_act.sort();
+
+        assert_eq!(visible_items_act, visible_items_exp);
+        // navigate down to and enter 'src/' directory
+    }
 }

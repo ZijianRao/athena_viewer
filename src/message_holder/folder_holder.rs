@@ -4,6 +4,9 @@ use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::mpsc;
+use std::sync::Arc;
+use std::thread;
 
 use crate::app::app_error::{AppError, AppResult};
 use crate::message_holder::file_helper::{FileGroupHolder, FileHolder};
@@ -14,6 +17,8 @@ pub const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(500) {
     Some(size) => size,
     None => panic!("DEFAULT_CACHE_SIZE must be non-zero"),
 };
+
+pub const EXPAND_THREAD_COUNT: usize = 4;
 
 /// Manages directory navigation, search filtering, and caching
 ///
@@ -82,7 +87,7 @@ impl FolderHolder {
     /// Returns `AppResult<()>` which may contain:
     /// - `AppError::Path`: If path resolution fails
     /// - `AppError::Parse`: If directory reading fails
-    pub fn expand(&mut self) -> AppResult<()> {
+    pub fn expand_single(&mut self) -> AppResult<()> {
         let first_item = self.current_holder[0].clone();
         let value_path_group: Vec<PathBuf> = self
             .current_holder
@@ -101,6 +106,64 @@ impl FolderHolder {
                 let file_holder = FileHolder::try_from(p.clone())?;
                 result.push(file_holder);
             }
+        }
+
+        self.current_holder = result;
+        self.update(None)?;
+        self.expand_level = self.expand_level.saturating_add(1);
+
+        Ok(())
+    }
+
+    pub fn expand(&mut self) -> AppResult<()> {
+        let first_item = self.current_holder[0].clone();
+        let paths_to_expand: Vec<PathBuf> = self
+            .current_holder
+            .iter()
+            .skip(1) // ignore ".." case
+            .filter_map(|p| p.to_path_canonicalize().ok())
+            .collect();
+        if paths_to_expand.is_empty() {
+            return Ok(());
+        }
+        let num_threads = std::cmp::min(paths_to_expand.len(), EXPAND_THREAD_COUNT);
+        let chunk_size = (paths_to_expand.len() + num_threads - 1) / num_threads;
+
+        let (tx, rx) = mpsc::channel();
+        let tx = Arc::new(tx);
+
+        let mut handle_group = Vec::new();
+        for chunk in paths_to_expand.chunks(chunk_size) {
+            let tx = Arc::clone(&tx);
+            let chunk = chunk.to_vec();
+
+            let handle = thread::spawn(move || {
+                for p in chunk {
+                    let result = if p.is_dir() {
+                        FileGroupHolder::new(p.clone(), false).unwrap().child
+                    } else {
+                        vec![FileHolder::try_from(p.clone()).unwrap()]
+                    };
+
+                    if tx.send(result).is_err() {
+                        break; // receiver dropped, stop processing
+                    }
+                }
+            });
+
+            handle_group.push(handle);
+        }
+
+        drop(tx);
+        let mut result = Vec::new();
+        result.push(first_item);
+        for mut received in rx {
+            result.append(&mut received);
+        }
+        for handle in handle_group {
+            handle
+                .join()
+                .map_err(|_| AppError::Path("Unable to expand".into()))?;
         }
 
         self.current_holder = result;
