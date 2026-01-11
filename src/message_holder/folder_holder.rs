@@ -19,6 +19,7 @@ pub const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(500) {
 };
 
 pub const EXPAND_THREAD_COUNT: usize = 4;
+pub const EXPAND_MULTI_THREAD_THRESHOLD: usize = EXPAND_THREAD_COUNT + 2;
 
 /// Manages directory navigation, search filtering, and caching
 ///
@@ -87,36 +88,7 @@ impl FolderHolder {
     /// Returns `AppResult<()>` which may contain:
     /// - `AppError::Path`: If path resolution fails
     /// - `AppError::Parse`: If directory reading fails
-    pub fn expand_single(&mut self) -> AppResult<()> {
-        let first_item = self.current_holder[0].clone();
-        let value_path_group: Vec<PathBuf> = self
-            .current_holder
-            .iter()
-            .skip(1) // ignore ".." case
-            .filter_map(|p| p.to_path_canonicalize().ok())
-            .collect();
-
-        let mut result = Vec::new();
-        result.push(first_item);
-        for p in &value_path_group {
-            if p.is_dir() {
-                let group = FileGroupHolder::new(p.clone(), false)?;
-                result.extend(group.child);
-            } else {
-                let file_holder = FileHolder::try_from(p.clone())?;
-                result.push(file_holder);
-            }
-        }
-
-        self.current_holder = result;
-        self.update(None)?;
-        self.expand_level = self.expand_level.saturating_add(1);
-
-        Ok(())
-    }
-
     pub fn expand(&mut self) -> AppResult<()> {
-        let first_item = self.current_holder[0].clone();
         let paths_to_expand: Vec<PathBuf> = self
             .current_holder
             .iter()
@@ -126,6 +98,44 @@ impl FolderHolder {
         if paths_to_expand.is_empty() {
             return Ok(());
         }
+
+        let folder_count = paths_to_expand.iter().filter(|&x| x.is_dir()).count();
+
+        let mut result = Vec::new();
+        let first_item = self.current_holder[0].clone();
+        result.push(first_item);
+
+        if folder_count < EXPAND_MULTI_THREAD_THRESHOLD {
+            Self::expand_single(&mut result, paths_to_expand)?;
+        } else {
+            Self::expand_multi_threaded(&mut result, paths_to_expand)?;
+        }
+
+        self.current_holder = result;
+        self.update(None)?;
+        self.expand_level = self.expand_level.saturating_add(1);
+
+        Ok(())
+    }
+
+    fn expand_single(holder: &mut Vec<FileHolder>, paths_to_expand: Vec<PathBuf>) -> AppResult<()> {
+        for p in &paths_to_expand {
+            if p.is_dir() {
+                let group = FileGroupHolder::new(p.clone(), false)?;
+                holder.extend(group.child);
+            } else {
+                let file_holder = FileHolder::try_from(p.clone())?;
+                holder.push(file_holder);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn expand_multi_threaded(
+        holder: &mut Vec<FileHolder>,
+        paths_to_expand: Vec<PathBuf>,
+    ) -> AppResult<()> {
         let num_threads = std::cmp::min(paths_to_expand.len(), EXPAND_THREAD_COUNT);
         let chunk_size = (paths_to_expand.len() + num_threads - 1) / num_threads;
 
@@ -155,20 +165,14 @@ impl FolderHolder {
         }
 
         drop(tx);
-        let mut result = Vec::new();
-        result.push(first_item);
         for mut received in rx {
-            result.append(&mut received);
+            holder.append(&mut received);
         }
         for handle in handle_group {
             handle
                 .join()
                 .map_err(|_| AppError::Path("Unable to expand".into()))?;
         }
-
-        self.current_holder = result;
-        self.update(None)?;
-        self.expand_level = self.expand_level.saturating_add(1);
 
         Ok(())
     }
