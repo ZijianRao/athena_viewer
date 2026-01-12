@@ -201,8 +201,7 @@ mod navigation_tests {
             "src/nested",
         ];
         visible_items_exp.sort();
-        let mut visible_items_act = app.get_visible_items();
-        visible_items_act.sort();
+        let visible_items_act = app.get_visible_items();
 
         assert_eq!(visible_items_act, visible_items_exp);
         // navigate down to and enter 'src/' directory

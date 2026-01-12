@@ -111,6 +111,7 @@ impl FolderHolder {
             Self::expand_multi_threaded(&mut result, paths_to_expand)?;
         }
 
+        result.sort_by_key(|p| p.to_path());
         self.current_holder = result;
         self.update(None)?;
         self.expand_level = self.expand_level.saturating_add(1);
