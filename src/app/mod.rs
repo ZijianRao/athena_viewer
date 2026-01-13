@@ -29,8 +29,13 @@ pub mod app_error;
 /// - `edit_history_folder_view` - Edit input mode with history/folder view
 pub mod state_handler;
 
+/// Minimum width for the input area (in terminal columns)
 const MIN_INPUT_WIDTH: u16 = 3;
+
+/// Padding to subtract from input area width for borders and cursor
 const INPUT_WIDTH_PADDING: u16 = 3;
+
+/// Duration between event polls (100ms)
 const TICK_RATE: Duration = Duration::from_millis(100);
 
 /// Main application struct that manages the TUI state and rendering

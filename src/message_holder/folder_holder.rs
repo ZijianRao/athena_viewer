@@ -18,7 +18,10 @@ pub const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(500) {
     None => panic!("DEFAULT_CACHE_SIZE must be non-zero"),
 };
 
+/// Number of threads to use for multi-threaded directory expansion
 pub const EXPAND_THREAD_COUNT: usize = 4;
+
+/// Minimum number of folders to trigger multi-threaded expansion
 pub const EXPAND_MULTI_THREAD_THRESHOLD: usize = EXPAND_THREAD_COUNT + 2;
 
 /// Manages directory navigation, search filtering, and caching
@@ -138,7 +141,7 @@ impl FolderHolder {
         paths_to_expand: Vec<PathBuf>,
     ) -> AppResult<()> {
         let num_threads = std::cmp::min(paths_to_expand.len(), EXPAND_THREAD_COUNT);
-        let chunk_size = (paths_to_expand.len() + num_threads - 1) / num_threads;
+        let chunk_size = paths_to_expand.len().div_ceil(num_threads);
 
         let (tx, rx) = mpsc::channel();
         let tx = Arc::new(tx);
@@ -332,7 +335,7 @@ impl FolderHolder {
 
         // to support symbolic link case
 
-        Ok(child.starts_with(&parent))
+        Ok(child.starts_with(parent))
     }
 
     /// Refreshes the current directory cache

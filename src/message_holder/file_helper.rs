@@ -8,6 +8,9 @@ use crate::app::app_error::{AppError, AppResult};
 use crate::message_holder::code_highlighter::CodeHighlighter;
 
 /// Maximum file size allowed for viewing (10MB)
+///
+/// Files larger than this limit will be rejected to prevent memory exhaustion
+/// and ensure responsive performance.
 pub const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
 
 /// Holds formatted file content and metadata for display
@@ -65,7 +68,7 @@ impl FileTextInfo {
     /// - `AppError::Path`: If file is too large (> 10MB)
     /// - `AppError::Parse`: If syntax highlighting fails
     pub fn new(value: &Path, code_highlighter: &CodeHighlighter) -> AppResult<Self> {
-        let meta_data = fs::metadata(value).map_err(|e| AppError::Io(e))?;
+        let meta_data = fs::metadata(value).map_err(AppError::Io)?;
         if meta_data.len() > MAX_FILE_SIZE {
             return Err(AppError::Path("File too large".into()));
         }
