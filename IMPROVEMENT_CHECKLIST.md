@@ -1,8 +1,8 @@
 # Athena Viewer - Actionable Improvement Checklist
 
-**Last Updated**: 2026-01-04
+**Last Updated**: 2026-01-16
 **Status**: Beta Candidate (80% to production)
-**Focus**: Fix 5 critical panics → Add tests → Add documentation
+**Focus**: Fix remaining critical panics → Add tests → Polish for release
 
 ---
 
@@ -341,16 +341,16 @@ if let Some(cached) = self.highlight_cache.get(&content_hash) {
 ## ✅ COMPLETION CHECKLIST
 
 ### Before Production (Must Complete)
-- [ ] Fix `app/mod.rs:53` - Terminal draw error
-- [ ] Fix `folder_holder.rs:14` - Const panic
-- [ ] Fix `folder_holder.rs:220` - Cache panic
-- [ ] Fix 4 test unwrap() calls in `message_holder/mod.rs`
+- [ ] Fix `app/mod.rs:115` - Terminal draw error (`.expect()` still present)
+- [ ] Fix `folder_holder.rs:16-19` - Const panic (uses `panic!()`)
+- [ ] Fix `folder_holder.rs:422-433` - Cache panic in `drop_invalid_folder()`
+- [ ] Fix 4 test unwrap() calls in `message_holder/mod.rs:409,413,420,427`
 - [ ] Add path traversal protection
 - [ ] Add error case tests (permission, deleted files)
 - [ ] Add edge case tests (empty dirs, unicode)
 
 ### Production Ready (Should Complete)
-- [ ] Add Rustdoc comments to all public items
+- [x] Add Rustdoc comments to all public items ✅ COMPLETE
 - [ ] Refactor large functions (< 50 lines)
 - [ ] Add constants for magic numbers
 - [ ] Add performance tests
@@ -369,10 +369,10 @@ if let Some(cached) = self.highlight_cache.get(&content_hash) {
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| **Panics** | 12 (5 critical) | 0 |
+| **Panics** | 4 critical remaining | 0 |
 | **Error Types** | 6 variants | 6 (stable) |
 | **Test Coverage** | 70% happy paths | 90%+ (add error cases) |
-| **Rustdoc Comments** | 0 | 100% of public items |
+| **Rustdoc Comments** | 100% ✅ | 100% (complete) |
 | **Performance** | 100x speedup | Maintain + optimize |
 
 ---
@@ -404,4 +404,4 @@ cargo build --release
 
 ---
 
-**Summary**: You're 80% to production. Focus on the 5 critical panics first (1-2 hours), then add tests and documentation. The architecture is excellent - just needs the final polish! 🎯
+**Summary**: You're 80% to production. Focus on the 4 critical panics first (1-2 hours), then add tests and documentation. The architecture is excellent - just needs the final polish! 🎯

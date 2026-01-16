@@ -1,12 +1,12 @@
 # Rust Code Review: Athena Viewer
 
-*Last Updated: 2026-01-13* (Current accurate analysis)
+*Last Updated: 2026-01-16* (Current accurate analysis)
 
 ## Executive Summary
 
-**Status**: Production-Ready Beta (v0.1.0) - **100% Complete** ✅
+**Status**: Beta Candidate (v0.1.0) - **80% Complete** ⚠️
 
-Athena Viewer is a **production-ready** terminal file viewer with comprehensive error handling, optimized performance, and full test coverage. All critical features are implemented with proper Rust idioms.
+Athena Viewer is a **beta candidate** terminal file viewer with strong error handling, optimized performance, and good test coverage. Most critical features are implemented, but 4 critical panics remain to be fixed before production readiness.
 
 ### Key Achievements
 
@@ -15,8 +15,14 @@ Athena Viewer is a **production-ready** terminal file viewer with comprehensive 
 2. **Performance**: O(n²) → O(n) algorithm (100x speedup) + multi-threading
 3. **Safety**: File size limits (10MB), path validation, bounds checking
 4. **Tests**: Integration tests + unit tests (70% happy path coverage)
-5. **Documentation**: All public items have comprehensive Rustdoc comments
+5. **Documentation**: All public items have comprehensive Rustdoc comments ✅
 6. **Architecture**: Clean module consolidation with proper separation
+
+#### ⚠️ Remaining Critical Issues
+1. **Terminal Draw Error**: `app/mod.rs:115` - Still uses `.expect()` on draw
+2. **Const Panic**: `folder_holder.rs:16-19` - Uses `panic!()` in const
+3. **Cache Panic**: `folder_holder.rs:422-433` - Returns error on cache miss
+4. **Test Unwraps**: `message_holder/mod.rs:409,413,420,427` - Uses `.unwrap()`
 
 #### 📊 Current Metrics
 - **Lines of Code**: ~950 (including tests)
@@ -24,8 +30,8 @@ Athena Viewer is a **production-ready** terminal file viewer with comprehensive 
 - **Test Coverage**: ~70% happy paths, unit tests for pure functions
 - **Module Files**: 10 (consolidated + app_error.rs)
 - **Performance**: 100x speedup for search operations
-- **Documentation**: 100% Rustdoc coverage on public items
-- **Panics**: 0 critical (all handled with proper error propagation)
+- **Documentation**: 100% Rustdoc coverage on public items ✅
+- **Panics**: 4 critical remaining (all in error paths)
 
 ---
 
@@ -99,17 +105,32 @@ let content = match fs::read_to_string(value) {
 
 ### 2.3 Critical Error Handling Examples
 
-#### Terminal Draw Error (app/mod.rs:110)
+#### Terminal Draw Error (app/mod.rs:115)
 ```rust
 terminal.draw(|frame| self.draw(frame).expect("Unexpected!"))?;
 ```
-**Status**: ⚠️ Still has `.expect()` - but this is in the main loop where panic is acceptable for terminal failures.
+**Status**: ⚠️ **CRITICAL** - Still has `.expect()` - should use `?` operator instead
 
-#### Cache Operations (folder_holder.rs)
+#### Const Panic (folder_holder.rs:16-19)
 ```rust
-self.cache_holder.put(path.to_path_buf(), holder);
+pub const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(500) {
+    Some(size) => size,
+    None => panic!("DEFAULT_CACHE_SIZE must be non-zero"),  // ⚠️ Const panic
+};
 ```
-**Status**: ✅ Proper error handling via `AppResult<()>` return types.
+**Status**: ⚠️ **CRITICAL** - Uses `panic!()` in const (safe but should use `unwrap()` or `const fn`)
+
+#### Cache Panic (folder_holder.rs:422-433)
+```rust
+pub fn drop_invalid_folder(&mut self, index: usize) -> AppResult<()> {
+    // ...
+    self.cache_holder
+        .pop(&removed.to_path())
+        .ok_or(AppError::Cache("Must contain the invalid path".into()))?;
+    // ...
+}
+```
+**Status**: ⚠️ **CRITICAL** - Returns error on cache miss (should handle gracefully)
 
 #### File Size Validation (file_helper.rs:69-71)
 ```rust
@@ -423,13 +444,13 @@ tempfile = "3.23"          # Test filesystem
 
 ## 8. Production Readiness Checklist
 
-### ✅ Critical Requirements
+### ⚠️ Critical Requirements (4 Remaining)
 - [x] **Error handling**: Complete with `thiserror`, 6 variants
 - [x] **Performance**: O(n²) → O(n) optimization
 - [x] **Safety**: File size limits, path validation, bounds checking
 - [x] **Tests**: Integration + unit tests
-- [x] **Documentation**: All public items have Rustdoc
-- [x] **No critical panics**: All error paths handled
+- [x] **Documentation**: All public items have Rustdoc ✅
+- [ ] **No critical panics**: 4 remaining (app/mod.rs:115, folder_holder.rs:16-19 & 422-433, message_holder/mod.rs tests)
 
 ### ✅ Code Quality
 - [x] **Rust idioms**: Proper trait implementations, enum patterns
@@ -437,8 +458,8 @@ tempfile = "3.23"          # Test filesystem
 - [x] **Error propagation**: Consistent use of `?` operator
 - [x] **Performance**: Optimized hot paths, caching, multi-threading
 
-### ✅ Security
-- [x] **Path validation**: Child path checking prevents traversal
+### ⚠️ Security (1 Remaining)
+- [ ] **Path validation**: Child path checking exists, but path traversal protection not fully implemented
 - [x] **File size limits**: 10MB max prevents DoS
 - [x] **Bounds checking**: All array accesses safe
 
@@ -446,27 +467,32 @@ tempfile = "3.23"          # Test filesystem
 
 ## 9. Summary & Recommendations
 
-### Current Status: **PRODUCTION-READY** ✅
+### Current Status: **BETA CANDIDATE** ⚠️
 
-**What Changed** (Jan 13, 2026):
+**What Changed** (Jan 16, 2026):
 - ✅ **Error Handling**: Complete `thiserror` integration (6 variants)
 - ✅ **Performance**: O(n²) → O(n) algorithm (100x speedup)
 - ✅ **Safety**: File size limits (10MB) implemented
 - ✅ **Tests**: Integration + unit tests (70% happy paths)
 - ✅ **Architecture**: Clean module consolidation
-- ✅ **Documentation**: All public items have Rustdoc comments
-- ✅ **Error Cases**: Permission denied, deleted files tested
-- ✅ **Path Security**: Child path validation implemented
+- ✅ **Documentation**: All public items have Rustdoc comments ✅
+- ⚠️ **Critical Panics**: 4 remaining to fix before production
 
 ### What's Excellent
 1. **Error handling**: Comprehensive, consistent, well-documented
 2. **Performance**: Significant optimization with smart multi-threading
 3. **Architecture**: Clean separation, good module organization
 4. **Testing**: Mock infrastructure, integration tests, unit tests
-5. **Documentation**: Complete Rustdoc coverage
+5. **Documentation**: Complete Rustdoc coverage ✅
 6. **Safety**: All critical protections implemented
 
-### Optional Future Enhancements
+### Remaining Critical Issues (Must Fix Before Production)
+1. **Terminal draw error** (`app/mod.rs:115`): Uses `.expect()` instead of `?`
+2. **Const panic** (`folder_holder.rs:16-19`): Uses `panic!()` in const
+3. **Cache panic** (`folder_holder.rs:422-433`): Returns error on cache miss
+4. **Test unwraps** (`message_holder/mod.rs:409,413,420,427`): Uses `.unwrap()`
+
+### Optional Future Enhancements (Nice to Have)
 1. **Syntax highlighting cache**: Reduce repeated work
 2. **Property-based testing**: `proptest` crate for edge cases
 3. **Configuration file**: User preferences
@@ -475,17 +501,17 @@ tempfile = "3.23"          # Test filesystem
 
 ### Final Verdict
 
-**Production Readiness**: **100% Complete** ✅
+**Production Readiness**: **80% Complete** ⚠️
 
 **Key Metrics**:
 - **Lines of Code**: ~950 (stable)
 - **Error Types**: 6 variants
 - **Test Coverage**: ~70% happy paths
 - **Performance**: 100x speedup
-- **Documentation**: 100% public items
-- **Panics**: 0 critical
+- **Documentation**: 100% public items ✅
+- **Panics**: 4 critical remaining
 
-**Recommendation**: **Ready for production deployment**. The architecture is solid, error handling is comprehensive, and all critical features are implemented with proper Rust idioms.
+**Recommendation**: **Beta candidate - needs final polish**. The architecture is solid, error handling is comprehensive, and documentation is complete. Fix the 4 critical panics (1-2 hours) to achieve production readiness.
 
 ---
 
@@ -498,7 +524,7 @@ tempfile = "3.23"          # Test filesystem
 4. **Module consolidation**: Clean architecture patterns
 5. **Test infrastructure**: Mock TUI, filesystem, event-based testing
 6. **State machines**: Enum-driven design with `Copy` + `Default`
-7. **Rustdoc conventions**: Complete API documentation
+7. **Rustdoc conventions**: Complete API documentation ✅
 8. **Safety patterns**: Input validation, bounds checking
 9. **Multi-threading**: Thread pools for I/O operations
 10. **Traits**: `TryFrom`, proper trait implementations
@@ -507,13 +533,13 @@ tempfile = "3.23"          # Test filesystem
 - **Error propagation**: Consistent `?` pattern throughout
 - **Performance awareness**: 100x speedup in critical path
 - **Safety-first**: All protections implemented
-- **Documentation**: Professional Rustdoc coverage
+- **Documentation**: Professional Rustdoc coverage ✅
 - **Testing**: Comprehensive mock infrastructure
 
-**Result**: Prototype → Production-ready beta with exceptional code quality.
+**Result**: Prototype → Beta candidate with exceptional code quality. Ready for final polish.
 
 ---
 
-**Grade**: V.1.2 → **Production-Ready (100% complete)** 🎉
+**Grade**: V.1.2 → **Beta Candidate (80% complete)** ⚠️
 
-*The project has achieved production readiness with comprehensive error handling, optimized performance, and full documentation. Ready for deployment.*
+*The project has achieved beta status with comprehensive error handling, optimized performance, and complete documentation. 4 critical panics remain to be fixed for production readiness.*
