@@ -13,10 +13,7 @@ use crate::message_holder::file_helper::{FileGroupHolder, FileHolder};
 use crate::state_holder::StateHolder;
 
 /// Default LRU cache size for directory listings
-pub const DEFAULT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(500) {
-    Some(size) => size,
-    None => panic!("DEFAULT_CACHE_SIZE must be non-zero"),
-};
+pub const DEFAULT_CACHE_SIZE: usize = 500;
 
 /// Number of threads to use for multi-threaded directory expansion
 pub const EXPAND_THREAD_COUNT: usize = 4;
@@ -66,7 +63,10 @@ impl FolderHolder {
     ) -> AppResult<Self> {
         let holder = FileGroupHolder::new(current_directory.clone(), true)?;
         let current_holder: Vec<FileHolder> = holder.child.clone();
-        let mut cache_holder = LruCache::new(DEFAULT_CACHE_SIZE);
+        let mut cache_holder = LruCache::new(
+            NonZeroUsize::new(DEFAULT_CACHE_SIZE)
+                .ok_or(AppError::Terminal("Unable to setup the cache!".into()))?,
+        );
         cache_holder.put(current_directory.clone(), holder);
 
         Ok(FolderHolder {
